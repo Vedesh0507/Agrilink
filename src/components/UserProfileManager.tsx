@@ -368,7 +368,7 @@ export default function UserProfileManager({ role: propRole }: UserProfileManage
       </div>
 
       {/* SECTION TABS */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-bold border-b border-neutral-200">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 text-xs font-bold border-b border-neutral-200 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {[
           { id: 'basic', label: '1. Contact & Identity', icon: User },
           {

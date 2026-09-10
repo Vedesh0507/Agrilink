@@ -24,6 +24,8 @@ import {
   Search,
   Check,
   Edit3,
+  Phone,
+  MessageCircle,
 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IBuyerRequirement, IProduceListing, IMatch, IQuotation, IOrder } from '@/types';
@@ -302,7 +304,7 @@ export default function BuyerDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3 md:mt-0">
             <button
               onClick={() => fetchData()}
               className="p-2.5 border border-neutral-200 hover:bg-neutral-50 rounded-xl text-neutral-700 transition-colors"
@@ -312,25 +314,27 @@ export default function BuyerDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('profile')}
-              className={`px-3.5 py-2.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-2.5 sm:px-3.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                 activeTab === 'profile'
                   ? 'bg-neutral-900 text-white border-neutral-900'
                   : 'border-neutral-300 hover:bg-neutral-50 text-neutral-700'
               }`}
             >
-              <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" /> Edit Profile
+              <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" />
+              <span>Profile</span>
             </button>
             <button
               onClick={() => setShowAddReqModal(true)}
-              className="px-4 py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2.5 sm:px-4 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all"
             >
-              <Plus className="w-4 h-4" /> Post Procurement Requirement
+              <Plus className="w-4 h-4" />
+              <span>Post <span className="hidden xs:inline sm:inline">Procurement </span>Requirement</span>
             </button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-neutral-200 overflow-x-auto py-3 text-xs font-bold">
+        <div className="flex items-center gap-2 border-b border-neutral-200 overflow-x-auto py-3 text-xs font-bold no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
             { id: 'overview', label: 'Overview', icon: TrendingUp },
             { id: 'requirements', label: `My Requirements (${requirements.length})`, icon: Layers },
@@ -659,7 +663,27 @@ export default function BuyerDashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-4 mt-2">
+                  <div className="pt-4 mt-2 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <a
+                        href={`tel:${(listing as any).farmerPhone || '+919999900000'}`}
+                        className="py-2 px-2 bg-neutral-100 hover:bg-neutral-200 text-black font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors border border-neutral-200"
+                        title="Direct Call to Producer"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-neutral-700" />
+                        <span>Call</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${((listing as any).farmerPhone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${(listing as any).farmerName || 'Farmer'}, I saw your ${listing.product} produce listing (${formatQuantity(listing.availableQuantity)}) on AgriLink and would like to procure.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors border border-emerald-200"
+                        title="Chat on WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
                     <button
                       onClick={() => handleRequestQuoteFromListing(listing)}
                       className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"

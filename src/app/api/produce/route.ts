@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { ProduceListing, BuyerRequirement, Match, AuditLog, Notification } from '@/models';
+import { ProduceListing, BuyerRequirement, Match, AuditLog, Notification, User } from '@/models';
 import { authenticateUser, authorizeRoles } from '@/lib/auth';
 import { ProduceListingSchema } from '@/validators';
 import { MatchingService } from '@/services/matchingService';
@@ -23,9 +23,25 @@ export async function GET(req: NextRequest) {
     if (qualityGrade) filter.qualityGrade = qualityGrade;
     if (status !== 'ALL') filter.status = status;
 
-    const listings = await ProduceListing.find(filter).sort({ createdAt: -1 });
+    const listings = await ProduceListing.find(filter).sort({ createdAt: -1 }).lean();
 
-    return NextResponse.json({ success: true, data: listings });
+    const farmerIds = Array.from(new Set(listings.map((l: any) => l.farmerId).filter(Boolean)));
+    const farmers = await User.find({ _id: { $in: farmerIds } })
+      .select('name phone alternatePhone email location')
+      .lean();
+    const farmerMap = new Map(farmers.map((f: any) => [f._id.toString(), f]));
+
+    const enriched = listings.map((l: any) => {
+      const farmer: any = farmerMap.get(l.farmerId);
+      return {
+        ...l,
+        farmerPhone: farmer?.phone || '+91 99999 00000',
+        farmerAlternatePhone: farmer?.alternatePhone || '',
+        farmerEmail: farmer?.email || '',
+      };
+    });
+
+    return NextResponse.json({ success: true, data: enriched });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

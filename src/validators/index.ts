@@ -73,7 +73,8 @@ export const BuyerRequirementSchema = z.object({
 export const QuotationRequestSchema = z.object({
   requirementId: z.string().optional(),
   matchId: z.string().optional(),
-  supplierId: z.string().min(1, 'Supplier ID is required'),
+  supplierId: z.string().optional(),
+  buyerId: z.string().optional(),
   product: z.string().min(1),
   quantity: z.number().positive(),
   unit: z.string().default('kg'),

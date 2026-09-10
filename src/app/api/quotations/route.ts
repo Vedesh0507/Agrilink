@@ -56,10 +56,55 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const data = validation.data;
 
-    // Find supplier details
-    const supplier = await User.findById(data.supplierId);
-    if (!supplier) {
-      return NextResponse.json({ success: false, error: 'Supplier not found' }, { status: 404 });
+    let buyerId: string;
+    let buyerName: string;
+    let supplierId: string;
+    let supplierName: string;
+    let targetNotifyUserId: string;
+    let notifyTitle: string;
+    let notifyMessage: string;
+    let notifyLink: string;
+
+    if (currentUser.role === 'FARMER') {
+      supplierId = currentUser._id.toString();
+      supplierName = currentUser.name;
+
+      const targetBuyerId = data.buyerId;
+      if (!targetBuyerId) {
+        return NextResponse.json({ success: false, error: 'buyerId is required for farmer supply offer' }, { status: 400 });
+      }
+
+      const buyer = await User.findById(targetBuyerId);
+      if (!buyer) {
+        return NextResponse.json({ success: false, error: 'Target buyer not found' }, { status: 404 });
+      }
+
+      buyerId = buyer._id.toString();
+      buyerName = buyer.name;
+      targetNotifyUserId = buyerId;
+      notifyTitle = 'Direct Farmer Supply Offer Received!';
+      notifyMessage = `${currentUser.name} offered to supply ${data.quantity} kg of ${data.product} at ₹${data.initialPrice}/kg.`;
+      notifyLink = '/buyer?tab=quotations';
+    } else {
+      buyerId = currentUser._id.toString();
+      buyerName = currentUser.name;
+
+      const targetSupplierId = data.supplierId;
+      if (!targetSupplierId) {
+        return NextResponse.json({ success: false, error: 'supplierId is required for buyer quotation request' }, { status: 400 });
+      }
+
+      const supplier = await User.findById(targetSupplierId);
+      if (!supplier) {
+        return NextResponse.json({ success: false, error: 'Target supplier not found' }, { status: 404 });
+      }
+
+      supplierId = supplier._id.toString();
+      supplierName = supplier.name;
+      targetNotifyUserId = supplierId;
+      notifyTitle = 'New Quotation Request Received';
+      notifyMessage = `${currentUser.name} requested a quotation for ${data.quantity} kg of ${data.product} at ₹${data.initialPrice}/kg.`;
+      notifyLink = '/farmer?tab=quotations';
     }
 
     const quotationNumber = `QT-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
@@ -69,10 +114,10 @@ export async function POST(req: NextRequest) {
       quotationNumber,
       requirementId: data.requirementId || undefined,
       matchId: data.matchId || undefined,
-      buyerId: currentUser._id.toString(),
-      buyerName: currentUser.name,
-      supplierId: supplier._id.toString(),
-      supplierName: supplier.name,
+      buyerId,
+      buyerName,
+      supplierId,
+      supplierName,
       product: data.product,
       quantity: data.quantity,
       unit: data.unit || 'kg',
@@ -90,29 +135,35 @@ export async function POST(req: NextRequest) {
           senderName: currentUser.name,
           proposedPrice: data.initialPrice,
           quantity: data.quantity,
-          notes: data.notes || 'Initial quotation request submitted.',
+          notes: data.notes || (currentUser.role === 'FARMER' ? 'Direct producer supply offer submitted.' : 'Initial quotation request submitted.'),
           createdAt: new Date(),
         },
       ],
     });
 
-    // Notify Supplier
+    // In-app notification for the counter-party
     await Notification.create({
-      userId: supplier._id.toString(),
-      title: 'New Quotation Request Received',
-      message: `${currentUser.name} requested a quotation for ${data.quantity} kg of ${data.product} at ₹${data.initialPrice}/kg.`,
+      userId: targetNotifyUserId,
+      title: notifyTitle,
+      message: notifyMessage,
       type: 'QUOTATION',
-      link: `/farmer/quotations`,
+      link: notifyLink,
     });
 
     // Audit log
     await AuditLog.create({
       actorId: currentUser._id.toString(),
       actorRole: currentUser.role,
-      action: 'CREATE_QUOTATION_REQUEST',
+      action: currentUser.role === 'FARMER' ? 'FARMER_SUPPLY_OFFER' : 'CREATE_QUOTATION_REQUEST',
       resource: 'Quotation',
       resourceId: quotation._id.toString(),
-      details: { supplierId: supplier._id, product: data.product, price: data.initialPrice },
+      details: {
+        buyerId,
+        supplierId,
+        product: data.product,
+        price: data.initialPrice,
+        quantity: data.quantity,
+      },
     });
 
     return NextResponse.json({ success: true, data: quotation }, { status: 201 });

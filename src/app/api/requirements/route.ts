@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { BuyerRequirement, ProduceListing, Match, AuditLog, Notification } from '@/models';
+import { BuyerRequirement, ProduceListing, Match, AuditLog, Notification, User } from '@/models';
 import { authenticateUser, authorizeRoles } from '@/lib/auth';
 import { BuyerRequirementSchema } from '@/validators';
 import { MatchingService } from '@/services/matchingService';
@@ -19,9 +19,28 @@ export async function GET(req: NextRequest) {
     if (product) filter.product = { $regex: product, $options: 'i' };
     if (status !== 'ALL') filter.status = status;
 
-    const requirements = await BuyerRequirement.find(filter).sort({ createdAt: -1 });
+    const requirements = await BuyerRequirement.find(filter).sort({ createdAt: -1 }).lean();
 
-    return NextResponse.json({ success: true, data: requirements });
+    const buyerIds = Array.from(new Set(requirements.map((r: any) => r.buyerId).filter(Boolean)));
+    const buyers = await User.find({ _id: { $in: buyerIds } })
+      .select('name phone alternatePhone email organizationId location')
+      .populate('organizationId', 'name')
+      .lean();
+    const buyerMap = new Map(buyers.map((b: any) => [b._id.toString(), b]));
+
+    const enriched = requirements.map((r: any) => {
+      const buyer: any = buyerMap.get(r.buyerId);
+      return {
+        ...r,
+        buyerPhone: buyer?.phone || '+91 99999 00000',
+        buyerAlternatePhone: buyer?.alternatePhone || '',
+        buyerEmail: buyer?.email || '',
+        buyerOrg: buyer?.organizationId?.name || r.organizationName || 'Institutional Wholesale Buyer',
+        buyerLocation: buyer?.location || r.deliveryLocation,
+      };
+    });
+
+    return NextResponse.json({ success: true, data: enriched });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
