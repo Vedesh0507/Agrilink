@@ -30,11 +30,13 @@ import {
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IBuyerRequirement, IProduceListing, IMatch, IQuotation, IOrder } from '@/types';
 import UserProfileManager from '@/components/UserProfileManager';
+import { useLanguage } from '@/context/LanguageContext';
 
 type TabType = 'overview' | 'requirements' | 'suppliers' | 'matches' | 'quotations' | 'orders' | 'profile';
 
 export default function BuyerDashboard() {
   const { user, token, role, demoLogin } = useAuth();
+  const { t, language } = useLanguage();
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
@@ -294,7 +296,7 @@ export default function BuyerDashboard() {
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-black bg-neutral-100 px-3 py-1 rounded-full border border-neutral-300 mb-2">
-                <Building2 className="w-3.5 h-3.5" /> Institutional Procurement Portal
+                <Building2 className="w-3.5 h-3.5" /> {t('buyer.portalTitle')}
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-black">
                 {user?.name}
@@ -308,7 +310,7 @@ export default function BuyerDashboard() {
             <button
               onClick={() => fetchData()}
               className="p-2.5 border border-neutral-200 hover:bg-neutral-50 rounded-xl text-neutral-700 transition-colors"
-              title="Refresh Data"
+              title={t('action.refresh')}
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -321,14 +323,14 @@ export default function BuyerDashboard() {
               }`}
             >
               <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" />
-              <span>Profile</span>
+              <span>{t('nav.profile')}</span>
             </button>
             <button
               onClick={() => setShowAddReqModal(true)}
               className="px-3.5 py-2.5 sm:px-4 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>Post <span className="hidden xs:inline sm:inline">Procurement </span>Requirement</span>
+              <span>{t('action.postRequirement')}</span>
             </button>
           </div>
         </div>
@@ -336,13 +338,13 @@ export default function BuyerDashboard() {
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-neutral-200 overflow-x-auto py-3 text-xs font-bold no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
-            { id: 'overview', label: 'Overview', icon: TrendingUp },
-            { id: 'requirements', label: `My Requirements (${requirements.length})`, icon: Layers },
-            { id: 'suppliers', label: `Find Suppliers (${suppliersListings.length})`, icon: Search },
-            { id: 'matches', label: `Smart Matches (${matches.length})`, icon: Sparkles },
-            { id: 'quotations', label: `Quotations (${quotations.length})`, icon: FileText },
-            { id: 'orders', label: `Orders (${orders.length})`, icon: Truck },
-            { id: 'profile', label: 'Buyer Profile', icon: User },
+            { id: 'overview', label: t('tab.overview'), icon: TrendingUp },
+            { id: 'requirements', label: `${t('tab.myRequirements')} (${requirements.length})`, icon: Layers },
+            { id: 'suppliers', label: `${t('tab.findSuppliers')} (${suppliersListings.length})`, icon: Search },
+            { id: 'matches', label: `${t('tab.smartMatches')} (${matches.length})`, icon: Sparkles },
+            { id: 'quotations', label: `${t('tab.quotations')} (${quotations.length})`, icon: FileText },
+            { id: 'orders', label: `${t('tab.orders')} (${orders.length})`, icon: Truck },
+            { id: 'profile', label: t('tab.buyerProfile'), icon: User },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -671,7 +673,7 @@ export default function BuyerDashboard() {
                         title="Direct Call to Producer"
                       >
                         <Phone className="w-3.5 h-3.5 text-neutral-700" />
-                        <span>Call</span>
+                        <span>{t('action.callFarmer')}</span>
                       </a>
                       <a
                         href={`https://wa.me/${((listing as any).farmerPhone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${(listing as any).farmerName || 'Farmer'}, I saw your ${listing.product} produce listing (${formatQuantity(listing.availableQuantity)}) on AgriLink and would like to procure.`)}`}
@@ -681,14 +683,14 @@ export default function BuyerDashboard() {
                         title="Chat on WhatsApp"
                       >
                         <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>WhatsApp</span>
+                        <span>{t('action.whatsapp')}</span>
                       </a>
                     </div>
                     <button
                       onClick={() => handleRequestQuoteFromListing(listing)}
                       className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <FileText className="w-3.5 h-3.5" /> Request Quotation
+                      <FileText className="w-3.5 h-3.5" /> {t('action.requestQuote')}
                     </button>
                   </div>
                 </div>

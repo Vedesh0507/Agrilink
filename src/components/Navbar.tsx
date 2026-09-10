@@ -3,10 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowRight, UserCheck, LogOut, UserPlus, LogIn, User } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
+import { ArrowRight, UserCheck, LogOut, UserPlus, LogIn, User, Globe } from 'lucide-react';
 
 export default function Navbar() {
   const { user, role, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   const profileHref = role === 'BUYER' ? '/buyer?tab=profile' : role === 'FARMER' ? '/farmer?tab=profile' : '/profile';
 
@@ -28,10 +30,41 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Right: Actions */}
+        {/* Right: Language Switcher & User Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* Multi-Language Selector Toggle */}
+          <div className="flex items-center border border-neutral-200 rounded-xl overflow-hidden bg-neutral-50 text-[10px] sm:text-xs font-bold shrink-0 shadow-xs">
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-2 sm:px-2.5 py-1.5 transition-colors ${
+                language === 'en' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+              }`}
+              title="English"
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage('te')}
+              className={`px-2 sm:px-2.5 py-1.5 transition-colors ${
+                language === 'te' ? 'bg-agri-orange-500 text-white font-black' : 'text-neutral-600 hover:text-black'
+              }`}
+              title="తెలుగు (Telugu)"
+            >
+              తెలుగు
+            </button>
+            <button
+              onClick={() => setLanguage('hi')}
+              className={`px-2 sm:px-2.5 py-1.5 transition-colors ${
+                language === 'hi' ? 'bg-black text-white font-black' : 'text-neutral-600 hover:text-black'
+              }`}
+              title="हिंदी (Hindi)"
+            >
+              हिंदी
+            </button>
+          </div>
+
           {user ? (
-            <div className="flex items-center gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
               <Link
                 href={profileHref}
                 title="View & Edit Profile"
@@ -41,7 +74,7 @@ export default function Navbar() {
                   {user.name}
                 </span>
                 <span className="text-[10px] font-semibold text-agri-orange-600 uppercase">
-                  {role === 'FARMER' ? 'Farmer / Producer' : role === 'BUYER' ? 'Institutional Buyer' : 'Administrator'}
+                  {role === 'FARMER' ? (language === 'te' ? 'రైతు / ఉత్పత్తిదారు' : language === 'hi' ? 'किसान / उत्पादक' : 'Farmer / Producer') : role === 'BUYER' ? (language === 'te' ? 'సంస్థాగత కొనుగోలుదారు' : language === 'hi' ? 'संस्थागत खरीदार' : 'Institutional Buyer') : 'Administrator'}
                 </span>
               </Link>
 
@@ -51,7 +84,7 @@ export default function Navbar() {
                 className="p-2 sm:p-2.5 text-neutral-600 hover:text-black border border-neutral-200 hover:border-neutral-300 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-1.5 text-xs font-bold shrink-0"
               >
                 <User className="w-4 h-4 text-agri-orange-500" />
-                <span className="hidden lg:inline">Profile</span>
+                <span className="hidden lg:inline">{t('nav.profile')}</span>
               </Link>
 
               {role === 'FARMER' && (
@@ -59,8 +92,8 @@ export default function Navbar() {
                   href="/farmer"
                   className="px-2.5 sm:px-4 py-2 sm:py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all flex items-center gap-1 sm:gap-1.5 shrink-0"
                 >
-                  <span className="hidden sm:inline">Farmer Dashboard</span>
-                  <span className="sm:hidden">Dashboard</span>
+                  <span className="hidden sm:inline">{t('nav.farmerPortal')}</span>
+                  <span className="sm:hidden">{t('nav.dashboard')}</span>
                   <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Link>
               )}
@@ -69,8 +102,8 @@ export default function Navbar() {
                   href="/buyer"
                   className="px-2.5 sm:px-4 py-2 sm:py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all flex items-center gap-1 sm:gap-1.5 shrink-0"
                 >
-                  <span className="hidden sm:inline">Buyer Dashboard</span>
-                  <span className="sm:hidden">Dashboard</span>
+                  <span className="hidden sm:inline">{t('nav.buyerPortal')}</span>
+                  <span className="sm:hidden">{t('nav.dashboard')}</span>
                   <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Link>
               )}
@@ -79,7 +112,7 @@ export default function Navbar() {
                   href="/admin"
                   className="px-2.5 sm:px-4 py-2 sm:py-2.5 bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm border border-neutral-700 transition-all flex items-center gap-1 sm:gap-1.5 shrink-0"
                 >
-                  <span className="hidden sm:inline">Admin Console</span>
+                  <span className="hidden sm:inline">{t('nav.adminConsole')}</span>
                   <span className="sm:hidden">Admin</span>
                   <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Link>
@@ -87,7 +120,7 @@ export default function Navbar() {
 
               <button
                 onClick={() => logout()}
-                title="Sign Out"
+                title={t('nav.signOut')}
                 className="p-2 sm:p-2.5 text-neutral-500 hover:text-black border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors shrink-0"
               >
                 <LogOut className="w-4 h-4" />
@@ -100,15 +133,15 @@ export default function Navbar() {
                 className="px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-neutral-800 hover:text-black border border-neutral-200 hover:border-neutral-300 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-1 sm:gap-1.5"
               >
                 <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500" />
-                <span>Sign In</span>
+                <span>{t('nav.signIn')}</span>
               </Link>
               <Link
                 href="/login?register=true"
                 className="px-3 sm:px-4 py-2 sm:py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all flex items-center gap-1 sm:gap-1.5"
               >
                 <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Create Account</span>
-                <span className="sm:hidden">Register</span>
+                <span className="hidden sm:inline">{t('nav.createAccount')}</span>
+                <span className="sm:hidden">{t('nav.register')}</span>
               </Link>
             </div>
           )}

@@ -30,11 +30,13 @@ import {
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IProduceListing, IQuotation, IOrder, IBuyerRequirement, IMatch } from '@/types';
 import UserProfileManager from '@/components/UserProfileManager';
+import { useLanguage } from '@/context/LanguageContext';
 
 type TabType = 'overview' | 'produce' | 'requirements' | 'matches' | 'quotations' | 'orders' | 'profile';
 
 export default function FarmerDashboard() {
   const { user, token, role, demoLogin } = useAuth();
+  const { t, language } = useLanguage();
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
@@ -336,7 +338,7 @@ export default function FarmerDashboard() {
           <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-agri-orange-600 bg-agri-orange-50 px-3 py-1 rounded-full border border-agri-orange-200 mb-2">
-                <Wheat className="w-3.5 h-3.5" /> Producer & Farmer Portal
+                <Wheat className="w-3.5 h-3.5" /> {t('farmer.portalTitle')}
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-black">
                 {user?.name}
@@ -350,7 +352,7 @@ export default function FarmerDashboard() {
             <button
               onClick={() => fetchData()}
               className="p-2 sm:p-2.5 border border-neutral-200 hover:bg-neutral-50 rounded-xl text-neutral-700 transition-colors"
-              title="Refresh Data"
+              title={t('action.refresh')}
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -363,14 +365,14 @@ export default function FarmerDashboard() {
               }`}
             >
               <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" />
-              <span>Edit Profile</span>
+              <span>{t('action.editProfile')}</span>
             </button>
             <button
               onClick={() => setShowAddProduceModal(true)}
               className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Produce Lot</span>
+              <span>{t('action.addProduce')}</span>
             </button>
           </div>
         </div>
@@ -378,12 +380,12 @@ export default function FarmerDashboard() {
         {/* Navigation Tabs - Mobile Smooth Scrollable */}
         <div className="flex items-center gap-1.5 sm:gap-2 border-b border-neutral-200 overflow-x-auto py-3 text-xs font-bold no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
-            { id: 'overview', label: 'Overview', icon: TrendingUp },
-            { id: 'produce', label: `My Produce (${listings.length})`, icon: Wheat },
-            { id: 'requirements', label: `Buyer Requests (${requirements.length})`, icon: Layers },
-            { id: 'quotations', label: `Quotations (${quotations.length})`, icon: FileText },
-            { id: 'orders', label: `Orders (${orders.length})`, icon: Truck },
-            { id: 'profile', label: 'Producer Profile', icon: User },
+            { id: 'overview', label: t('tab.overview'), icon: TrendingUp },
+            { id: 'produce', label: `${t('tab.myProduce')} (${listings.length})`, icon: Wheat },
+            { id: 'requirements', label: `${t('tab.buyerRequests')} (${requirements.length})`, icon: Layers },
+            { id: 'quotations', label: `${t('tab.quotations')} (${quotations.length})`, icon: FileText },
+            { id: 'orders', label: `${t('tab.orders')} (${orders.length})`, icon: Truck },
+            { id: 'profile', label: t('tab.producerProfile'), icon: User },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -758,7 +760,7 @@ export default function FarmerDashboard() {
                             title="Call Buyer Directly"
                           >
                             <Phone className="w-3.5 h-3.5 text-agri-orange-500" />
-                            <span>Call Buyer</span>
+                            <span>{t('action.callBuyer')}</span>
                           </a>
                         )}
                         <a
@@ -769,7 +771,7 @@ export default function FarmerDashboard() {
                           title="Chat with Buyer on WhatsApp"
                         >
                           <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>WhatsApp</span>
+                          <span>{t('action.whatsapp')}</span>
                         </a>
                       </div>
 
@@ -778,7 +780,7 @@ export default function FarmerDashboard() {
                         className="w-full sm:w-auto px-4 py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow transition-all"
                       >
                         <Send className="w-3.5 h-3.5" />
-                        <span>Send Supply Offer</span>
+                        <span>{t('action.sendOffer')}</span>
                       </button>
                     </div>
                   </div>
