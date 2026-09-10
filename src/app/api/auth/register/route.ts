@@ -5,7 +5,19 @@ import { User, Organization, AuditLog } from '@/models';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, password, role, location, phone, organizationName } = body;
+    const {
+      name,
+      email,
+      password,
+      role,
+      location,
+      phone,
+      organizationName,
+      organizationType,
+      primaryCrops,
+      capacity,
+      gstin,
+    } = body;
 
     if (!name || !email || !password || !role || !location) {
       return NextResponse.json(
@@ -31,23 +43,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Default org type mapping if not specified
+    const defaultOrgType = role === 'FARMER' ? 'FARMER_COLLECTIVE' : 'WHOLESALER';
+    const finalOrgType = organizationType || defaultOrgType;
+
     // Organization
     let organizationId = undefined;
-    if (organizationName) {
-      let org = await Organization.findOne({ name: organizationName.trim() });
-      if (!org) {
-        org = await Organization.create({
-          name: organizationName.trim(),
-          type: role === 'FARMER' ? 'FARMER_COLLECTIVE' : 'WHOLESALER',
-          contactPerson: name,
-          email: email.trim().toLowerCase(),
-          phone: phone || '',
-          address: { city: location, state: 'Andhra Pradesh', pincode: '520001' },
-          verified: true,
-        });
-      }
-      organizationId = org._id;
+    const finalOrgName = organizationName ? organizationName.trim() : (role === 'FARMER' ? `${name}'s Farm Collective` : `${name}'s Procurement Hub`);
+    
+    let org = await Organization.findOne({ name: finalOrgName });
+    if (!org) {
+      org = await Organization.create({
+        name: finalOrgName,
+        type: finalOrgType,
+        contactPerson: name,
+        email: email.trim().toLowerCase(),
+        phone: phone || '',
+        gstin: gstin || '',
+        primaryCrops: primaryCrops || '',
+        capacity: capacity || '',
+        address: { city: location, state: 'Andhra Pradesh', pincode: '520001' },
+        verified: true,
+      });
     }
+    organizationId = org._id;
 
     const firebaseUid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -62,7 +81,7 @@ export async function POST(req: NextRequest) {
       location,
     });
 
-    const token = `agri_user_${firebaseUid}_${Date.now()}`;
+    const token = `agri_user_${user._id}_${encodeURIComponent(user.email)}_${Date.now()}`;
 
     // Audit log
     await AuditLog.create({

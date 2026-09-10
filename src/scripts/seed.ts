@@ -417,7 +417,7 @@ export async function runDatabaseSeed() {
     },
   });
 
-  console.log('✅ Database seeding complete! Ready for hackathon demonstration.');
+  console.log('✅ Database seeding complete! Ready for production demonstration.');
 }
 
 // If executed directly from command line

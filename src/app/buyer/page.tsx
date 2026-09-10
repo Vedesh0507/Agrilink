@@ -23,9 +23,11 @@ import {
   RefreshCw,
   Search,
   Check,
+  Edit3,
 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IBuyerRequirement, IProduceListing, IMatch, IQuotation, IOrder } from '@/types';
+import UserProfileManager from '@/components/UserProfileManager';
 
 type TabType = 'overview' | 'requirements' | 'suppliers' | 'matches' | 'quotations' | 'orders' | 'profile';
 
@@ -42,7 +44,7 @@ export default function BuyerDashboard() {
   const [quotations, setQuotations] = useState<IQuotation[]>([]);
   const [orders, setOrders] = useState<IOrder[]>([]);
 
-  // Modals
+  // Modals & Actions
   const [showAddReqModal, setShowAddReqModal] = useState(false);
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showRequestQuoteModal, setShowRequestQuoteModal] = useState(false);
@@ -50,6 +52,7 @@ export default function BuyerDashboard() {
   const [selectedListingForQuote, setSelectedListingForQuote] = useState<IProduceListing | null>(null);
   const [counterPrice, setCounterPrice] = useState<number>(0);
   const [counterNotes, setCounterNotes] = useState('');
+  const [recalculatingMatch, setRecalculatingMatch] = useState<string | null>(null);
 
   // New Requirement Form
   const [newReq, setNewReq] = useState({
@@ -64,16 +67,40 @@ export default function BuyerDashboard() {
     notes: 'Urgent institutional procurement for daily distribution across supermarket outlets.',
   });
 
+  const handleExploreMatches = async (reqId?: string) => {
+    if (!token) return;
+    setRecalculatingMatch(reqId || 'all');
+    try {
+      const payload = reqId ? { requirementId: reqId } : { buyerId: user?._id };
+      await fetch('/api/matches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      await fetchData();
+      setActiveTab('matches');
+    } catch (err) {
+      console.error('Error recalculating matches:', err);
+      setActiveTab('matches');
+    } finally {
+      setRecalculatingMatch(null);
+    }
+  };
+
   const fetchData = async () => {
     if (!token && !user) return;
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
+      const matchesUrl = user?._id ? `/api/matches?buyerId=${user._id}` : '/api/matches';
 
       const [resReqs, resListings, resMatches, resQuotes, resOrders] = await Promise.all([
         fetch(`/api/requirements?buyerId=${user?._id || ''}`, { headers }),
         fetch('/api/produce?status=AVAILABLE', { headers }),
-        fetch('/api/matches', { headers }),
+        fetch(matchesUrl, { headers }),
         fetch('/api/quotations', { headers }),
         fetch('/api/orders', { headers }),
       ]);
@@ -99,6 +126,14 @@ export default function BuyerDashboard() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['overview', 'requirements', 'suppliers', 'matches', 'quotations', 'orders', 'profile'].includes(tabParam)) {
+        setActiveTab(tabParam as TabType);
+      }
+    }
+
     if (user && token && (user.role === 'BUYER' || user.role === 'ADMIN')) {
       fetchData();
     } else {
@@ -241,22 +276,13 @@ export default function BuyerDashboard() {
               </p>
             </div>
 
-            <div className="space-y-3 pt-2">
+            <div className="pt-2">
               <a
                 href="/login?role=BUYER"
                 className="w-full py-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
               >
-                Sign In as Buyer <ArrowRight className="w-4 h-4" />
+                Sign In to Procurement Account <ArrowRight className="w-4 h-4" />
               </a>
-              <button
-                type="button"
-                onClick={async () => {
-                  await demoLogin('BUYER');
-                }}
-                className="w-full py-2.5 bg-agri-orange-50 hover:bg-agri-orange-100 text-agri-orange-700 font-bold rounded-xl text-xs border border-agri-orange-200 transition-colors"
-              >
-                Quick Access with Sample Buyer Account (Godavari Fresh)
-              </button>
             </div>
           </div>
         </div>
@@ -272,7 +298,7 @@ export default function BuyerDashboard() {
                 {user?.name}
               </h1>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Wholesale Sourcing Hub • Vijayawada Central Distribution Center
+              {(user as any)?.organizationName || (user?.organizationId as any)?.name || 'Wholesale Sourcing Hub'} • {user?.location || 'Vijayawada Central Distribution Center'}
             </p>
           </div>
 
@@ -283,6 +309,16 @@ export default function BuyerDashboard() {
               title="Refresh Data"
             >
               <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`px-3.5 py-2.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                activeTab === 'profile'
+                  ? 'bg-neutral-900 text-white border-neutral-900'
+                  : 'border-neutral-300 hover:bg-neutral-50 text-neutral-700'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" /> Edit Profile
             </button>
             <button
               onClick={() => setShowAddReqModal(true)}
@@ -365,29 +401,71 @@ export default function BuyerDashboard() {
               </div>
             </div>
 
-            {/* Critical Hackathon Aggregated Demo Spotlight */}
-            <div className="p-6 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-black px-3 py-1 rounded-full border border-neutral-800">
-                  <Sparkles className="w-3 h-3 text-agri-orange-500" /> Enterprise Multi-Supplier Sourcing
+            {/* Dynamic Sourcing & Matching Spotlight */}
+            {matches.length > 0 ? (
+              <div className="p-6 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-black px-3 py-1 rounded-full border border-neutral-800">
+                    <Sparkles className="w-3 h-3 text-agri-orange-500" /> Algorithmic Supply Matching Engine
+                  </div>
+                  <h3 className="text-xl font-black text-white">
+                    {matches.length} Supply Matching Opportunities Identified
+                  </h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    AgriLink has matched your active procurement criteria with verified farmer supply lots and aggregated cooperative bundles across Andhra Pradesh.
+                  </p>
                 </div>
-                <h3 className="text-xl font-black text-white">
-                  Aggregated Procurement Opportunity: 2,000 kg Grade-A Tomatoes
-                </h3>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  The matching engine discovered that while no single farmer has 2,000 kg, combining
-                  <strong> Farmer A (500 kg)</strong> + <strong>Farmer B (700 kg)</strong> +{' '}
-                  <strong>Farmer C (800 kg)</strong> satisfies 100% of your requirement in Vijayawada!
-                </p>
-              </div>
 
-              <button
-                onClick={() => setActiveTab('matches')}
-                className="px-6 py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-agri-orange-500/20 transition-all shrink-0"
-              >
-                Inspect Aggregation Bundle <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+                <button
+                  onClick={() => setActiveTab('matches')}
+                  className="px-6 py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-agri-orange-500/20 transition-all shrink-0"
+                >
+                  Inspect Matches ({matches.length}) <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            ) : openRequirements.length === 0 ? (
+              <div className="p-6 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-black px-3 py-1 rounded-full border border-neutral-800">
+                    <Sparkles className="w-3 h-3 text-agri-orange-500" /> Institutional Sourcing
+                  </div>
+                  <h3 className="text-xl font-black text-white">
+                    Post Your Crop Demand to Source Directly from Agricultural Producers
+                  </h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    Define target volume, quality grade, and delivery hub. AgriLink's deterministic matching engine automatically aggregates smallholder farmers to satisfy bulk institutional requirements.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowAddReqModal(true)}
+                  className="px-6 py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-agri-orange-500/20 transition-all shrink-0"
+                >
+                  + Post First Requirement <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="p-6 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-black px-3 py-1 rounded-full border border-neutral-800">
+                    <Sparkles className="w-3 h-3 text-agri-orange-500" /> Direct Producer Catalog
+                  </div>
+                  <h3 className="text-xl font-black text-white">
+                    {suppliersListings.length} Active Farmer Lots Available on Exchange
+                  </h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    Explore verified farm lots, filter by quality grade and district, and initiate price quotation requests directly with producers.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('suppliers')}
+                  className="px-6 py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-agri-orange-500/20 transition-all shrink-0"
+                >
+                  Browse Farmer Supply ({suppliersListings.length}) <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Current Open Requirements */}
             <div className="bg-white rounded-2xl border border-neutral-200 p-5">
@@ -512,10 +590,12 @@ export default function BuyerDashboard() {
 
                   <div className="pt-2 flex justify-end">
                     <button
-                      onClick={() => setActiveTab('matches')}
-                      className="px-4 py-2 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors"
+                      onClick={() => handleExploreMatches(req._id)}
+                      disabled={recalculatingMatch === req._id}
+                      className="px-4 py-2 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-agri-orange-500" /> Explore Matches
+                      <Sparkles className={`w-3.5 h-3.5 text-agri-orange-500 ${recalculatingMatch === req._id ? 'animate-spin' : ''}`} />
+                      {recalculatingMatch === req._id ? 'Evaluating Produce Lots...' : 'Explore Matches'}
                     </button>
                   </div>
                 </div>
@@ -596,255 +676,321 @@ export default function BuyerDashboard() {
         {/* TAB 4: SMART MATCHES (CRITICAL DEMO FEATURE) */}
         {activeTab === 'matches' && (
           <div className="py-6 space-y-6">
-            <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-agri-orange-600 bg-agri-orange-50 px-3 py-1 rounded-full border border-agri-orange-200 mb-1">
-                <Sparkles className="w-3.5 h-3.5" /> Deterministic 6-Factor Matching Engine
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-agri-orange-600 bg-agri-orange-50 px-3 py-1 rounded-full border border-agri-orange-200 mb-1">
+                  <Sparkles className="w-3.5 h-3.5" /> Deterministic 6-Factor Matching Engine
+                </div>
+                <h2 className="text-xl font-black text-black">
+                  Procurement Matches & Multi-Farmer Aggregation
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  Fuzzy & normalized compatibility scoring across product (30%), quantity (20%), quality (15%), location (15%), date (10%), and price (10%).
+                </p>
               </div>
-              <h2 className="text-xl font-black text-black">
-                Procurement Matches & Multi-Farmer Aggregation
-              </h2>
-              <p className="text-xs text-neutral-500">
-                Transparent compatibility calculation across product (30%), quantity (20%), quality (15%), location (15%), date (10%), and price (10%).
-              </p>
+
+              <button
+                onClick={() => handleExploreMatches()}
+                disabled={recalculatingMatch !== null}
+                className="px-4 py-2 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-colors self-start sm:self-auto disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${recalculatingMatch !== null ? 'animate-spin text-agri-orange-500' : 'text-agri-orange-500'}`} />
+                <span>{recalculatingMatch !== null ? 'Scanning Farm Network...' : 'Recalculate Matches'}</span>
+              </button>
             </div>
 
-            <div className="space-y-6">
-              {matches.map((m, idx) => {
-                const isAggregated = m.matchType === 'AGGREGATED_SUPPLY';
-
-                return (
-                  <div
-                    key={m._id || idx}
-                    className={`p-6 rounded-3xl border transition-all ${
-                      isAggregated
-                        ? 'bg-black text-white border-neutral-800 shadow-2xl ring-2 ring-agri-orange-500/50'
-                        : 'bg-white text-black border-neutral-200 shadow-sm'
-                    }`}
+            {matches.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-3xl border border-neutral-200 p-8 space-y-4 shadow-sm">
+                <div className="w-12 h-12 bg-agri-orange-50 text-agri-orange-600 rounded-2xl flex items-center justify-center mx-auto">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-black">No Active Matches Found</h3>
+                  <p className="text-xs text-neutral-500 max-w-md mx-auto mt-1">
+                    Either no farmer produce currently matches your open requirements, or listings were added recently. Click below to re-scan the farm supply network.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => handleExploreMatches()}
+                    disabled={recalculatingMatch !== null}
+                    className="px-5 py-2.5 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs inline-flex items-center gap-2"
                   >
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-neutral-200/20 gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                              isAggregated
-                                ? 'bg-agri-orange-500 text-white'
-                                : 'bg-neutral-100 text-black border border-neutral-300'
-                            }`}
-                          >
-                            {isAggregated ? '★ Multi-Supplier Aggregation Bundle' : 'Single Supplier Lot'}
-                          </span>
-                          <span className="text-xs text-neutral-400">
-                            Fulfillment: {m.isFullyFulfilled ? '100% Target Met' : 'Partial'}
-                          </span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${recalculatingMatch !== null ? 'animate-spin' : ''}`} />
+                    Re-scan Farm Supply Network
+                  </button>
+                  <button
+                    onClick={() => setShowAddReqModal(true)}
+                    className="px-5 py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Post Requirement
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {matches.map((m, idx) => {
+                  const isAggregated = m.matchType === 'AGGREGATED_SUPPLY';
+                  const reqObj = typeof m.requirementId === 'object' && m.requirementId ? (m.requirementId as any) : null;
+                  const reqProd = reqObj?.product || 'Produce';
+
+                  return (
+                    <div
+                      key={m._id || idx}
+                      className={`p-6 rounded-3xl border transition-all ${
+                        isAggregated
+                          ? 'bg-black text-white border-neutral-800 shadow-2xl ring-2 ring-agri-orange-500/50'
+                          : 'bg-white text-black border-neutral-200 shadow-sm'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-neutral-200/20 gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                                isAggregated
+                                  ? 'bg-agri-orange-500 text-white'
+                                  : 'bg-neutral-100 text-black border border-neutral-300'
+                              }`}
+                            >
+                              {isAggregated ? '★ Multi-Supplier Aggregation Bundle' : 'Single Supplier Lot'}
+                            </span>
+                            <span className="text-xs text-neutral-400">
+                              Requirement: <strong className={isAggregated ? 'text-white' : 'text-black'}>{reqProd}</strong> • Fulfillment: {m.isFullyFulfilled ? '100% Target Met' : 'Partial'}
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-black mt-1">
+                            {isAggregated
+                              ? `Consolidated ${formatQuantity(m.matchedQuantity)} Collective Supply Pool (${m.suppliers.length} Producers)`
+                              : `${m.suppliers[0]?.farmerName} — ${formatQuantity(m.matchedQuantity)}`}
+                          </h3>
                         </div>
-                        <h3 className="text-lg font-black mt-1">
-                          {isAggregated
-                            ? `Consolidated 2,000 kg Grade-A Tomato Pool (${m.suppliers.length} Producers)`
-                            : `${m.suppliers[0]?.farmerName} — ${formatQuantity(m.matchedQuantity)}`}
-                        </h3>
-                      </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="text-xs text-neutral-400">Explainable Match Score</div>
-                          <div
-                            className={`text-3xl font-black ${
-                              isAggregated ? 'text-agri-orange-400' : 'text-agri-orange-600'
-                            }`}
-                          >
-                            {m.totalScore}%
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Participating Suppliers Breakdown */}
-                    <div className="py-4">
-                      <h4
-                        className={`text-xs font-bold uppercase tracking-wider mb-3 ${
-                          isAggregated ? 'text-neutral-300' : 'text-neutral-500'
-                        }`}
-                      >
-                        Participating Suppliers in this Match:
-                      </h4>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {m.suppliers.map((sup, sIdx) => (
-                          <div
-                            key={sIdx}
-                            className={`p-3.5 rounded-2xl text-xs space-y-1.5 ${
-                              isAggregated
-                                ? 'bg-neutral-900 border border-neutral-800'
-                                : 'bg-neutral-50 border border-neutral-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between font-bold">
-                              <span>{sup.farmerName}</span>
-                              <span className="text-agri-orange-500">{sup.allocatedQuantity} kg</span>
-                            </div>
-                            <div className="flex items-center justify-between text-neutral-400 text-[11px]">
-                              <span>Grade: {sup.qualityGrade}</span>
-                              <span>₹{sup.expectedPrice}/kg</span>
-                            </div>
-                            <div className="text-[11px] text-neutral-400 flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-agri-orange-500" /> {sup.location}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Cumulative Total Highlight for Aggregated Match */}
-                      {isAggregated && (
-                        <div className="mt-3 p-3.5 rounded-2xl bg-neutral-950 border border-agri-orange-500/40 flex items-center justify-between text-xs">
-                          <div>
-                            <span className="text-neutral-400">Total Bundled Quantity:</span>
-                            <div className="text-base font-black text-white">
-                              500 kg (Farmer A) + 700 kg (Farmer B) + 800 kg (Farmer C) ={' '}
-                              <span className="text-agri-orange-400">2,000 kg (Exact Target)</span>
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <span className="text-neutral-400 text-[11px]">Harmonized Avg:</span>
-                            <div className="font-bold text-white">₹28.3 / kg</div>
+                            <div className="text-xs text-neutral-400">Explainable Match Score</div>
+                            <div
+                              className={`text-3xl font-black ${
+                                isAggregated ? 'text-agri-orange-400' : 'text-agri-orange-600'
+                              }`}
+                            >
+                              {m.totalScore}%
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 6-Factor Compatibility Breakdown */}
-                    <div className="py-3 border-t border-b border-neutral-200/20 text-xs">
-                      <h4
-                        className={`text-xs font-bold uppercase tracking-wider mb-2 ${
-                          isAggregated ? 'text-neutral-300' : 'text-neutral-500'
-                        }`}
-                      >
-                        Transparent Match Factor Breakdown:
-                      </h4>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center">
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Product (Max 30)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.productScore || 30}/30
-                          </span>
-                        </div>
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Quantity (Max 20)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.quantityScore || 20}/20
-                          </span>
-                        </div>
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Quality (Max 15)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.qualityScore || 15}/15
-                          </span>
-                        </div>
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Location (Max 15)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.locationScore || 15}/15
-                          </span>
-                        </div>
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Date (Max 10)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.dateScore || 10}/10
-                          </span>
-                        </div>
-                        <div
-                          className={`p-2.5 rounded-xl ${
-                            isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
-                          }`}
-                        >
-                          <span className="text-[10px] text-neutral-400 block">Price (Max 10)</span>
-                          <span className="font-black text-sm text-agri-orange-500">
-                            {m.compatibilityBreakdown?.priceScore || 10}/10
-                          </span>
                         </div>
                       </div>
 
-                      {m.compatibilityBreakdown?.explanation && (
-                        <p className="text-[11px] text-neutral-400 italic mt-3">
-                          Explanation: {m.compatibilityBreakdown.explanation.quantity} —{' '}
-                          {m.compatibilityBreakdown.explanation.location}
-                        </p>
-                      )}
-                    </div>
+                      {/* Participating Suppliers Breakdown */}
+                      <div className="py-4">
+                        <h4
+                          className={`text-xs font-bold uppercase tracking-wider mb-3 ${
+                            isAggregated ? 'text-neutral-300' : 'text-neutral-500'
+                          }`}
+                        >
+                          Participating Suppliers in this Match:
+                        </h4>
 
-                    {/* Actions */}
-                    <div className="pt-4 flex items-center justify-end gap-3">
-                      <button
-                        onClick={async () => {
-                          const primarySup = m.suppliers[0];
-                          if (!primarySup || !token) return;
-                          try {
-                            const res = await fetch('/api/quotations', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                Authorization: `Bearer ${token}`,
-                              },
-                              body: JSON.stringify({
-                                requirementId: m.requirementId,
-                                supplierId: primarySup.farmerId,
-                                product: 'Tomato (Grade A)',
-                                quantity: m.matchedQuantity,
-                                unit: 'kg',
-                                qualityGrade: primarySup.qualityGrade,
-                                initialPrice: primarySup.expectedPrice,
-                                deliveryLocation: user?.location || 'Vijayawada, AP',
-                                deliveryDate: new Date('2026-09-15'),
-                                notes: isAggregated
-                                  ? 'Multi-farmer aggregation quotation request initiated.'
-                                  : 'Single farmer quotation initiated from smart match.',
-                              }),
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                              alert('Quotation requested! Check Quotations tab.');
-                              setActiveTab('quotations');
-                              fetchData();
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {m.suppliers.map((sup, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className={`p-3.5 rounded-2xl text-xs space-y-1.5 ${
+                                isAggregated
+                                  ? 'bg-neutral-900 border border-neutral-800'
+                                  : 'bg-neutral-50 border border-neutral-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between font-bold">
+                                <span>{sup.farmerName}</span>
+                                <span className="text-agri-orange-500">{sup.allocatedQuantity} kg</span>
+                              </div>
+                              <div className="flex items-center justify-between text-neutral-400 text-[11px]">
+                                <span>Grade: {sup.qualityGrade}</span>
+                                <span>₹{sup.expectedPrice}/kg</span>
+                              </div>
+                              <div className="text-[11px] text-neutral-400 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-agri-orange-500" /> {sup.location}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Cumulative Total Highlight for Aggregated Match */}
+                        {isAggregated && (
+                          <div className="mt-3 p-3.5 rounded-2xl bg-neutral-950 border border-agri-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-3">
+                            <div>
+                              <span className="text-neutral-400">Total Bundled Quantity:</span>
+                              <div className="text-sm sm:text-base font-black text-white">
+                                {m.suppliers.map((s, idx) => (
+                                  <span key={idx}>
+                                    {idx > 0 ? ' + ' : ''}
+                                    {s.allocatedQuantity} kg ({s.farmerName})
+                                  </span>
+                                ))} ={' '}
+                                <span className="text-agri-orange-400">
+                                  {m.matchedQuantity} kg ({m.isFullyFulfilled ? '100% Target' : 'Partial Match'})
+                                </span>
+                              </div>
+                            </div>
+                            <div className="sm:text-right">
+                              <span className="text-neutral-400 text-[11px]">Harmonized Avg:</span>
+                              <div className="font-bold text-white">
+                                ₹
+                                {(
+                                  m.suppliers.reduce((sum, s) => sum + (s.expectedPrice || 0) * (s.allocatedQuantity || 0), 0) /
+                                  (m.matchedQuantity || 1)
+                                ).toFixed(1)}{' '}
+                                / kg
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 6-Factor Compatibility Breakdown */}
+                      <div className="py-3 border-t border-b border-neutral-200/20 text-xs">
+                        <h4
+                          className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                            isAggregated ? 'text-neutral-300' : 'text-neutral-500'
+                          }`}
+                        >
+                          Transparent Match Factor Breakdown:
+                        </h4>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center">
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Product (Max 30)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.productScore || 30}/30
+                            </span>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Quantity (Max 20)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.quantityScore || 20}/20
+                            </span>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Quality (Max 15)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.qualityScore || 15}/15
+                            </span>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Location (Max 15)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.locationScore || 15}/15
+                            </span>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Date (Max 10)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.dateScore || 10}/10
+                            </span>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              isAggregated ? 'bg-neutral-900' : 'bg-neutral-50'
+                            }`}
+                          >
+                            <span className="text-[10px] text-neutral-400 block">Price (Max 10)</span>
+                            <span className="font-black text-sm text-agri-orange-500">
+                              {m.compatibilityBreakdown?.priceScore || 10}/10
+                            </span>
+                          </div>
+                        </div>
+
+                        {m.compatibilityBreakdown?.explanation && (
+                          <div className={`mt-3 p-3 rounded-xl border text-[11px] space-y-1 ${
+                            isAggregated ? 'bg-neutral-900 border-neutral-800 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+                          }`}>
+                            <div className="font-semibold flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-agri-orange-500" />
+                              <span className={isAggregated ? 'text-white' : 'text-black'}>Commodity Match: {m.compatibilityBreakdown.explanation.product}</span>
+                            </div>
+                            <div>
+                              Quantity: {m.compatibilityBreakdown.explanation.quantity} • Proximity: {m.compatibilityBreakdown.explanation.location}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="pt-4 flex items-center justify-end gap-3">
+                        <button
+                          onClick={async () => {
+                            const primarySup = m.suppliers[0];
+                            if (!primarySup || !token) return;
+                            try {
+                              const res = await fetch('/api/quotations', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  requirementId: typeof m.requirementId === 'object' ? (m.requirementId as any)?._id : m.requirementId,
+                                  supplierId: primarySup.farmerId,
+                                  product: `${reqProd} (${primarySup.qualityGrade})`,
+                                  quantity: m.matchedQuantity,
+                                  unit: 'kg',
+                                  qualityGrade: primarySup.qualityGrade,
+                                  initialPrice: primarySup.expectedPrice,
+                                  deliveryLocation: reqObj?.deliveryLocation || user?.location || 'Vijayawada, AP',
+                                  deliveryDate: reqObj?.requiredDeliveryDate ? new Date(reqObj.requiredDeliveryDate) : new Date(Date.now() + 7 * 86400000),
+                                  notes: isAggregated
+                                    ? `Multi-farmer aggregation quotation request for ${reqProd} (${m.matchedQuantity} kg).`
+                                    : `Single farmer quotation initiated from smart match for ${reqProd}.`,
+                                }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                alert('Quotation requested! Check Quotations tab.');
+                                setActiveTab('quotations');
+                                fetchData();
+                              } else {
+                                alert(data.error || 'Failed to request quotation');
+                              }
+                            } catch (e: any) {
+                              alert(e.message);
                             }
-                          } catch (e: any) {
-                            alert(e.message);
-                          }
-                        }}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                          isAggregated
-                            ? 'bg-agri-orange-500 hover:bg-agri-orange-600 text-white shadow-lg shadow-agri-orange-500/30'
-                            : 'bg-black hover:bg-neutral-800 text-white'
-                        }`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        {isAggregated ? 'Request Aggregated Quotation' : 'Request Supplier Quotation'}
-                      </button>
+                          }}
+                          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                            isAggregated
+                              ? 'bg-agri-orange-500 hover:bg-agri-orange-600 text-white shadow-lg shadow-agri-orange-500/30'
+                              : 'bg-black hover:bg-neutral-800 text-white'
+                          }`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {isAggregated ? 'Request Aggregated Quotation' : 'Request Supplier Quotation'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1068,32 +1214,8 @@ export default function BuyerDashboard() {
 
         {/* TAB 7: PROFILE */}
         {activeTab === 'profile' && (
-          <div className="py-6 max-w-xl">
-            <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-black">Buyer Organization Details</h2>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-neutral-500">Authorized Procurement Officer:</span>
-                  <div className="font-bold text-black text-sm">{user?.name}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Corporate Email:</span>
-                  <div className="font-bold text-black text-sm">{user?.email}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Distribution Hub:</span>
-                  <div className="font-bold text-black text-sm">{user?.location}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Corporate Entity:</span>
-                  <div className="font-bold text-black text-sm">Godavari Fresh Foods & Supermarkets (Verified)</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Platform Identity:</span>
-                  <div className="font-mono text-neutral-600 text-[11px]">{user?.firebaseUid}</div>
-                </div>
-              </div>
-            </div>
+          <div className="py-6">
+            <UserProfileManager role="BUYER" />
           </div>
         )}
       </div>

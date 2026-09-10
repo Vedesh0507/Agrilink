@@ -37,9 +37,20 @@ export interface IUser {
   email: string;
   name: string;
   phone?: string;
+  alternatePhone?: string;
+  bio?: string;
   role: UserRole;
-  organizationId?: string;
+  organizationId?: string | IOrganization;
+  organizationName?: string;
   location: string;
+  kycStatus?: 'VERIFIED' | 'PENDING' | 'SUBMITTED';
+  bankDetails?: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+  };
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -47,17 +58,32 @@ export interface IUser {
 export interface IOrganization {
   _id?: string;
   name: string;
-  type: 'FARMER_COLLECTIVE' | 'INDIVIDUAL_FARMER' | 'WHOLESALER' | 'RETAILER' | 'PROCESSOR' | 'INSTITUTION';
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: {
-    city: string;
-    state: string;
-    pincode: string;
+  type: 'FARMER_COLLECTIVE' | 'INDIVIDUAL_FARMER' | 'WHOLESALER' | 'RETAILER' | 'PROCESSOR' | 'INSTITUTION' | 'EXPORTER';
+  contactPerson?: string;
+  designation?: string;
+  email?: string;
+  phone?: string;
+  gstin?: string;
+  panNumber?: string;
+  fssaiNumber?: string;
+  primaryCrops?: string;
+  capacity?: string;
+  landArea?: string;
+  farmingType?: string;
+  farmingExperience?: string;
+  nearestMandi?: string;
+  procurementVolume?: string;
+  preferredPaymentTerms?: string;
+  address?: {
+    street?: string;
+    landmark?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
   };
   verified: boolean;
   createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface IProduceListing {

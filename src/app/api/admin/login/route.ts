@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { User, AuditLog } from '@/models';
 
-const ADMIN_EMAIL = 'pavanmanpealli521@gmail.com';
+const ADMIN_EMAILS = ['pavanmanpealli521@gmail.com', 'pavanmanepalli521@gmail.com'];
 const ADMIN_PASS = 'Vedesh@07';
 
 export async function POST(req: NextRequest) {
@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (email.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASS) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!ADMIN_EMAILS.includes(normalizedEmail) || password !== ADMIN_PASS) {
       return NextResponse.json(
         { success: false, error: 'Access Denied: Invalid administrator credentials.' },
         { status: 401 }
@@ -27,16 +28,20 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Ensure the admin user profile exists in MongoDB Atlas
-    let adminUser = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
+    let adminUser = await User.findOne({ email: { $in: ADMIN_EMAILS } });
     if (!adminUser) {
       adminUser = await User.create({
         firebaseUid: 'admin_pavan_uid',
-        email: ADMIN_EMAIL.toLowerCase(),
-        name: 'Pavan Manpealli (Platform Administrator)',
+        email: normalizedEmail,
+        password: ADMIN_PASS,
+        name: 'Pavan Manepalli (Platform Administrator)',
         phone: '+91 99999 00000',
         role: 'ADMIN',
         location: 'Vijayawada Headquarters',
       });
+    } else if (!adminUser.password) {
+      adminUser.password = ADMIN_PASS;
+      await adminUser.save();
     }
 
     // Generate secure admin session token
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
       actorRole: 'ADMIN',
       action: 'ADMIN_SIGN_IN_SUCCESS',
       resource: 'ADMIN_PORTAL',
-      details: { email: ADMIN_EMAIL },
+      details: { email: normalizedEmail },
     });
 
     return NextResponse.json({

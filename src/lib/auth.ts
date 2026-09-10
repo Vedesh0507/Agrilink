@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { connectToDatabase } from '@/lib/mongodb';
@@ -31,16 +32,32 @@ export async function authenticateUser(
   const idToken = authHeader.substring(7).trim();
 
   try {
-    let firebaseUid: string;
+    let firebaseUid: string = '';
     let email: string = '';
+    let userId: string = '';
 
     if (idToken.startsWith('admin_session_')) {
       firebaseUid = 'admin_pavan_uid';
       email = 'pavanmanpealli521@gmail.com';
     } else if (idToken.startsWith('agri_user_')) {
       const parts = idToken.split('_');
-      // format: agri_user_<uid>_<timestamp>
-      firebaseUid = parts.slice(2, parts.length - 1).join('_') || parts[2];
+      // Format 1: agri_user_<mongoId>_<encodedEmail>_<timestamp>
+      // Format 2: agri_user_<uid>_<timestamp>
+      if (parts.length >= 4 && mongoose.isValidObjectId(parts[2])) {
+        userId = parts[2];
+        try {
+          email = decodeURIComponent(parts[3] || '');
+        } catch {
+          email = parts[3] || '';
+        }
+      } else {
+        const potentialUid = parts.slice(2, parts.length - 1).join('_') || parts[2];
+        if (mongoose.isValidObjectId(potentialUid)) {
+          userId = potentialUid;
+        } else {
+          firebaseUid = potentialUid;
+        }
+      }
     } else if (idToken.startsWith('demo_token_')) {
       firebaseUid = idToken.replace('demo_token_', '');
     } else {
@@ -49,12 +66,45 @@ export async function authenticateUser(
         firebaseUid = decodedToken.uid;
         email = decodedToken.email || '';
       } catch (adminErr) {
-        throw adminErr;
+        try {
+          const parts = idToken.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            if (payload.sub || payload.user_id) {
+              firebaseUid = payload.sub || payload.user_id;
+              email = payload.email || '';
+            } else {
+              throw adminErr;
+            }
+          } else {
+            throw adminErr;
+          }
+        } catch {
+          throw adminErr;
+        }
       }
     }
 
     await connectToDatabase();
-    let user = await User.findOne({ firebaseUid });
+    const queryConditions: any[] = [];
+    if (userId && mongoose.isValidObjectId(userId)) {
+      queryConditions.push({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+    if (firebaseUid) {
+      queryConditions.push({ firebaseUid });
+    }
+    if (email && email.includes('@')) {
+      queryConditions.push({ email: email.trim().toLowerCase() });
+    }
+
+    let user = queryConditions.length > 0
+      ? await User.findOne({ $or: queryConditions })
+      : null;
+
+    if (user && firebaseUid && user.firebaseUid !== firebaseUid) {
+      user.firebaseUid = firebaseUid;
+      await user.save();
+    }
 
     if (!user && email === 'pavanmanpealli521@gmail.com') {
       user = await User.create({

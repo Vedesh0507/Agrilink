@@ -8,6 +8,43 @@ export const UserProfileSchema = z.object({
   location: z.string().min(2, 'Location is required'),
 });
 
+export const UpdateProfileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+  phone: z.string().optional(),
+  alternatePhone: z.string().optional(),
+  bio: z.string().optional(),
+  location: z.string().optional(),
+  organizationName: z.string().optional(),
+  organizationType: z.enum(['FARMER_COLLECTIVE', 'INDIVIDUAL_FARMER', 'WHOLESALER', 'RETAILER', 'PROCESSOR', 'INSTITUTION', 'EXPORTER']).optional(),
+  contactPerson: z.string().optional(),
+  designation: z.string().optional(),
+  gstin: z.string().optional(),
+  panNumber: z.string().optional(),
+  fssaiNumber: z.string().optional(),
+  primaryCrops: z.string().optional(),
+  capacity: z.string().optional(),
+  landArea: z.string().optional(),
+  farmingType: z.string().optional(),
+  farmingExperience: z.string().optional(),
+  nearestMandi: z.string().optional(),
+  procurementVolume: z.string().optional(),
+  preferredPaymentTerms: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    landmark: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    pincode: z.string().optional(),
+  }).optional(),
+  bankDetails: z.object({
+    accountHolderName: z.string().optional(),
+    bankName: z.string().optional(),
+    accountNumber: z.string().optional(),
+    ifscCode: z.string().optional(),
+    upiId: z.string().optional(),
+  }).optional(),
+});
+
 export const ProduceListingSchema = z.object({
   product: z.string().min(2, 'Product name is required'),
   variety: z.string().optional(),

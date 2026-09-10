@@ -20,7 +20,7 @@ export default function DemoBar() {
     <div className="bg-black text-white text-xs px-4 py-2 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-2 sticky top-0 z-50">
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1 bg-agri-orange-500 text-white font-semibold px-2 py-0.5 rounded text-[10px] tracking-wide uppercase">
-          <Sparkles className="w-3 h-3" /> Hackathon Demo Switcher
+          <Sparkles className="w-3 h-3" /> Enterprise Demo Switcher
         </span>
         <span className="text-neutral-400 hidden sm:inline">
           Active Role: <strong className="text-white">{role || 'GUEST / PUBLIC'}</strong>

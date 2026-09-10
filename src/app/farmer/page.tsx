@@ -22,9 +22,11 @@ import {
   Send,
   Check,
   RefreshCw,
+  Edit3,
 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IProduceListing, IQuotation, IOrder, IBuyerRequirement, IMatch } from '@/types';
+import UserProfileManager from '@/components/UserProfileManager';
 
 type TabType = 'overview' | 'produce' | 'requirements' | 'matches' | 'quotations' | 'orders' | 'profile';
 
@@ -92,6 +94,14 @@ export default function FarmerDashboard() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['overview', 'produce', 'requirements', 'matches', 'quotations', 'orders', 'profile'].includes(tabParam)) {
+        setActiveTab(tabParam as TabType);
+      }
+    }
+
     // Only fetch if authenticated as farmer or admin
     if (user && token && (user.role === 'FARMER' || user.role === 'ADMIN')) {
       fetchData();
@@ -248,22 +258,13 @@ export default function FarmerDashboard() {
               </p>
             </div>
 
-            <div className="space-y-3 pt-2">
+            <div className="pt-2">
               <a
                 href="/login?role=FARMER"
                 className="w-full py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
               >
-                Sign In as Farmer <ArrowRight className="w-4 h-4" />
+                Sign In to Producer Account <ArrowRight className="w-4 h-4" />
               </a>
-              <button
-                type="button"
-                onClick={async () => {
-                  await demoLogin('FARMER');
-                }}
-                className="w-full py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-xl text-xs border border-neutral-300 transition-colors"
-              >
-                Quick Access with Sample Farmer Account (Ramesh Patel)
-              </button>
             </div>
           </div>
         </div>
@@ -279,7 +280,7 @@ export default function FarmerDashboard() {
                 {user?.name}
               </h1>
             <p className="text-xs text-neutral-500 mt-0.5">
-              {user?.location || 'Vijayawada Region'} • Krishna River Farmers Collective
+              {user?.location || 'Vijayawada Region'} • {(user as any)?.organizationName || (user?.organizationId as any)?.name || 'Agricultural Producer Collective'}
             </p>
           </div>
 
@@ -290,6 +291,16 @@ export default function FarmerDashboard() {
               title="Refresh Data"
             >
               <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`px-3.5 py-2.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                activeTab === 'profile'
+                  ? 'bg-neutral-900 text-white border-neutral-900'
+                  : 'border-neutral-300 hover:bg-neutral-50 text-neutral-700'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5 text-agri-orange-500" /> Edit Profile
             </button>
             <button
               onClick={() => setShowAddProduceModal(true)}
@@ -371,26 +382,68 @@ export default function FarmerDashboard() {
               </div>
             </div>
 
-            {/* Quick Demo Scenario Alert */}
-            <div className="p-5 rounded-2xl bg-black text-white border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-neutral-900 px-2.5 py-1 rounded-full">
-                  Consolidated Procurement Pool
-                </span>
-                <h3 className="text-base font-bold text-white mt-2">
-                  Farmer A: 500 kg Grade-A Tomato Lot Committed to Aggregated Pool
-                </h3>
-                <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-                  Your 500 kg lot is combined with Farmer B (700 kg) and Farmer C (800 kg) to satisfy Godavari Fresh Foods' 2,000 kg procurement order in Vijayawada!
-                </p>
+            {/* Dynamic Market Status Banner */}
+            {pendingQuotations.length > 0 ? (
+              <div className="p-5 rounded-2xl bg-black text-white border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-neutral-900 px-2.5 py-1 rounded-full">
+                    Active Quotation Negotiation
+                  </span>
+                  <h3 className="text-base font-bold text-white mt-2">
+                    {pendingQuotations.length} Pending Buyer Quotation Request(s)
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+                    Wholesale institutional buyers have submitted quotation requests for your produce lots. Review agreed prices, submit counter-offers, or accept to generate official purchase orders.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('quotations')}
+                  className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs transition-colors shrink-0"
+                >
+                  Review Quotations ({pendingQuotations.length})
+                </button>
               </div>
-              <button
-                onClick={() => setActiveTab('quotations')}
-                className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs transition-colors shrink-0"
-              >
-                Review Negotiation
-              </button>
-            </div>
+            ) : listings.length === 0 ? (
+              <div className="p-5 rounded-2xl bg-black text-white border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-neutral-900 px-2.5 py-1 rounded-full">
+                    Producer Market Access
+                  </span>
+                  <h3 className="text-base font-bold text-white mt-2">
+                    List Your Harvest Lots for Direct Institutional Procurement
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+                    Publish your available crop quantities, quality grades, and expected price. AgriLink will automatically index your supply for bulk institutional buyers and regional aggregation pools.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddProduceModal(true)}
+                  className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs transition-colors shrink-0"
+                >
+                  + Add First Produce Lot
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 rounded-2xl bg-black text-white border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-neutral-900 px-2.5 py-1 rounded-full">
+                    Active Harvest Catalog
+                  </span>
+                  <h3 className="text-base font-bold text-white mt-2">
+                    {listings.length} Produce Lot(s) Live on AgriLink Exchange ({formatQuantity(totalAvailableKg)})
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+                    Your produce is currently discoverable by verified buyers, food processors, and wholesale merchants. Check Buyer Requests to propose quotations for open purchase demands.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('requirements')}
+                  className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs transition-colors shrink-0"
+                >
+                  Browse Buyer Demands ({requirements.length})
+                </button>
+              </div>
+            )}
 
             {/* Recent Produce Listings Table */}
             <div className="bg-white rounded-2xl border border-neutral-200 p-5">
@@ -842,32 +895,8 @@ export default function FarmerDashboard() {
 
         {/* TAB 6: PRODUCER PROFILE */}
         {activeTab === 'profile' && (
-          <div className="py-6 max-w-xl">
-            <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-black">Producer Verification Details</h2>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-neutral-500">Producer Name:</span>
-                  <div className="font-bold text-black text-sm">{user?.name}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Contact Email:</span>
-                  <div className="font-bold text-black text-sm">{user?.email}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Registered Agricultural Hub:</span>
-                  <div className="font-bold text-black text-sm">{user?.location}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Collective Affiliation:</span>
-                  <div className="font-bold text-black text-sm">Krishna River Farmers Collective (Verified)</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Platform Identity:</span>
-                  <div className="font-mono text-neutral-600 text-[11px]">{user?.firebaseUid}</div>
-                </div>
-              </div>
-            </div>
+          <div className="py-6">
+            <UserProfileManager role="FARMER" />
           </div>
         )}
       </div>

@@ -25,37 +25,44 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Re-run matching engine for a requirement
+// Re-run matching engine for a requirement or buyer
 export async function POST(req: NextRequest) {
   try {
     const { error, context } = await authenticateUser(req);
     if (error) return error;
 
-    const { requirementId } = await req.json();
-    if (!requirementId) {
-      return NextResponse.json({ success: false, error: 'requirementId is required' }, { status: 400 });
-    }
+    const body = await req.json().catch(() => ({}));
+    const requirementId = body.requirementId;
+    const buyerId = body.buyerId || (requirementId ? undefined : context!.user._id.toString());
 
     await connectToDatabase();
-    const requirement = await BuyerRequirement.findById(requirementId);
-    if (!requirement) {
-      return NextResponse.json({ success: false, error: 'Requirement not found' }, { status: 404 });
-    }
 
     const availableListings = await ProduceListing.find({
       status: 'AVAILABLE',
       availableQuantity: { $gt: 0 },
     });
 
-    const newMatches = MatchingService.generateMatches(requirement, availableListings);
+    let requirementsToProcess: any[] = [];
+    if (requirementId) {
+      const requirement = await BuyerRequirement.findById(requirementId);
+      if (!requirement) {
+        return NextResponse.json({ success: false, error: 'Requirement not found' }, { status: 404 });
+      }
+      requirementsToProcess = [requirement];
+    } else if (buyerId) {
+      requirementsToProcess = await BuyerRequirement.find({ buyerId, status: 'OPEN' });
+    } else {
+      return NextResponse.json({ success: false, error: 'requirementId or buyerId is required' }, { status: 400 });
+    }
 
-    // Delete old proposed matches for this requirement and insert fresh ones
-    await Match.deleteMany({ requirementId, status: 'PROPOSED' });
-
-    const inserted = [];
-    for (const m of newMatches) {
-      const doc = await Match.create(m);
-      inserted.push(doc);
+    const inserted: any[] = [];
+    for (const reqDoc of requirementsToProcess) {
+      const newMatches = MatchingService.generateMatches(reqDoc, availableListings);
+      await Match.deleteMany({ requirementId: reqDoc._id.toString(), status: 'PROPOSED' });
+      for (const m of newMatches) {
+        const doc = await Match.create(m);
+        inserted.push(doc);
+      }
     }
 
     return NextResponse.json({ success: true, data: inserted, count: inserted.length });

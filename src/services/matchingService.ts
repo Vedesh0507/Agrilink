@@ -21,6 +21,124 @@ export interface ScoredListing {
   };
 }
 
+// Canonical dictionary of common agricultural commodities, vernacular names, and misspellings
+const COMMODITY_ALIASES: Record<string, string> = {
+  // Onions & Alliums
+  onion: 'onion',
+  onions: 'onion',
+  onon: 'onion',
+  onons: 'onion',
+  onionn: 'onion',
+  ullipaya: 'onion',
+  ullipayalu: 'onion',
+  pyaaz: 'onion',
+  pyaz: 'onion',
+  kanda: 'onion',
+
+  // Tomatoes
+  tomato: 'tomato',
+  tomatoes: 'tomato',
+  tomatos: 'tomato',
+  tamato: 'tomato',
+  tamata: 'tomato',
+  tamatar: 'tomato',
+  tamakaya: 'tomato',
+
+  // Potatoes
+  potato: 'potato',
+  potatoes: 'potato',
+  potatos: 'potato',
+  aloo: 'potato',
+  alu: 'potato',
+  bangaladumpa: 'potato',
+  batata: 'potato',
+
+  // Chillies
+  chilli: 'chilli',
+  chillies: 'chilli',
+  chili: 'chilli',
+  chilis: 'chilli',
+  chilly: 'chilli',
+  mirchi: 'chilli',
+  mirapakaya: 'chilli',
+  pacha_mirchi: 'chilli',
+
+  // Staples & Vegetables
+  carrot: 'carrot',
+  carrots: 'carrot',
+  gajar: 'carrot',
+  cabbage: 'cabbage',
+  cabbages: 'cabbage',
+  cauliflower: 'cauliflower',
+  gobi: 'cauliflower',
+  brinjal: 'brinjal',
+  brinjals: 'brinjal',
+  eggplant: 'brinjal',
+  vankaya: 'brinjal',
+  baingan: 'brinjal',
+  ginger: 'ginger',
+  allam: 'ginger',
+  adrak: 'ginger',
+  garlic: 'garlic',
+  vellulli: 'garlic',
+  lahsun: 'garlic',
+  rice: 'rice',
+  paddy: 'rice',
+  dhan: 'rice',
+  biyyam: 'rice',
+  wheat: 'wheat',
+  gehun: 'wheat',
+  godhuma: 'wheat',
+  godhumalu: 'wheat',
+  corn: 'maize',
+  maize: 'maize',
+  makka: 'maize',
+  makkajonna: 'maize',
+};
+
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+function normalizeCommodity(raw: string): string {
+  if (!raw) return '';
+  const cleaned = raw.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (COMMODITY_ALIASES[cleaned]) return COMMODITY_ALIASES[cleaned];
+
+  // Plural stripping / stemming
+  if (cleaned.endsWith('ies')) {
+    const stem = cleaned.slice(0, -3) + 'y';
+    if (COMMODITY_ALIASES[stem]) return COMMODITY_ALIASES[stem];
+    const stem2 = cleaned.slice(0, -3) + 'i';
+    if (COMMODITY_ALIASES[stem2]) return COMMODITY_ALIASES[stem2];
+  }
+  if (cleaned.endsWith('es')) {
+    const stem = cleaned.slice(0, -2);
+    if (COMMODITY_ALIASES[stem]) return COMMODITY_ALIASES[stem];
+  }
+  if (cleaned.endsWith('s') && cleaned.length > 3) {
+    const stem = cleaned.slice(0, -1);
+    if (COMMODITY_ALIASES[stem]) return COMMODITY_ALIASES[stem];
+  }
+  return cleaned;
+}
+
 export class MatchingService {
   /**
    * Evaluates individual score of a produce listing against a buyer requirement.
@@ -36,23 +154,44 @@ export class MatchingService {
     req: IBuyerRequirementDocument,
     listing: IProduceListingDocument
   ): ScoredListing {
-    // 1. Product Compatibility (Max 30)
+    // 1. Product Compatibility (Max 30) - with Fuzzy & Normalized Stem Matching
     let productScore = 0;
     let productExpl = 'Different product';
     const reqProduct = req.product.trim().toLowerCase();
     const listProduct = listing.product.trim().toLowerCase();
 
-    if (reqProduct === listProduct) {
+    const normReq = normalizeCommodity(reqProduct);
+    const normList = normalizeCommodity(listProduct);
+
+    if (normReq === normList || reqProduct === listProduct) {
       productScore = 30;
-      productExpl = 'Perfect product match';
+      productExpl = `Direct commodity match (${listing.product})`;
       if (req.variety && listing.variety) {
         if (req.variety.toLowerCase() === listing.variety.toLowerCase()) {
-          productExpl += ` (${listing.variety} variety matched)`;
+          productExpl += ` • ${listing.variety} variety matched`;
         }
       }
-    } else if (reqProduct.includes(listProduct) || listProduct.includes(reqProduct)) {
-      productScore = 20;
-      productExpl = 'Partial / category match';
+    } else if (
+      normReq.includes(normList) ||
+      normList.includes(normReq) ||
+      reqProduct.includes(listProduct) ||
+      listProduct.includes(reqProduct)
+    ) {
+      productScore = 26;
+      productExpl = `Category & variety affinity (${listing.product})`;
+    } else {
+      // Fuzzy string comparison via Levenshtein edit distance
+      const dist = levenshteinDistance(normReq, normList);
+      const maxLen = Math.max(normReq.length, normList.length);
+      const similarity = maxLen > 0 ? 1 - dist / maxLen : 0;
+
+      if (dist <= 2 || similarity >= 0.65) {
+        productScore = 28;
+        productExpl = `Fuzzy commodity match (${req.product} ≈ ${listing.product})`;
+      } else {
+        productScore = 0;
+        productExpl = `Different product (${listing.product} vs ${req.product})`;
+      }
     }
 
     // 2. Quantity Match (Max 20)
@@ -192,7 +331,7 @@ export class MatchingService {
       .filter((l) => l.status === 'AVAILABLE' && l.availableQuantity > 0)
       .map((l) => this.scoreListing(req, l))
       // Filter listings with relevant product match
-      .filter((s) => s.productScore >= 20)
+      .filter((s) => s.productScore >= 15)
       .sort((a, b) => b.totalScore - a.totalScore);
 
     const matches: IMatch[] = [];
@@ -238,7 +377,7 @@ export class MatchingService {
       });
     }
 
-    // 2. Multi-Supplier Aggregation Match (The critical Hackathon Demo feature!)
+    // 2. Multi-Supplier Aggregation Match (Enterprise Supply Pooling Protocol)
     // If no single supplier meets 100% of quantity, or even if partial suppliers exist,
     // evaluate aggregating complementary top-scoring farmers to hit the target requirement.
     const partialSuppliers = scoredListings.filter(

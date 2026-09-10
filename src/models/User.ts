@@ -7,9 +7,19 @@ export interface IUserDocument extends Document {
   password?: string;
   name: string;
   phone?: string;
+  alternatePhone?: string;
+  bio?: string;
   role: UserRole;
   organizationId?: mongoose.Types.ObjectId;
   location: string;
+  kycStatus?: 'VERIFIED' | 'PENDING' | 'SUBMITTED';
+  bankDetails?: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +53,14 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       trim: true,
     },
+    alternatePhone: {
+      type: String,
+      trim: true,
+    },
+    bio: {
+      type: String,
+      trim: true,
+    },
     role: {
       type: String,
       enum: ['FARMER', 'BUYER', 'ADMIN'],
@@ -58,6 +76,18 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       required: true,
       trim: true,
+    },
+    kycStatus: {
+      type: String,
+      enum: ['VERIFIED', 'PENDING', 'SUBMITTED'],
+      default: 'VERIFIED',
+    },
+    bankDetails: {
+      accountHolderName: { type: String, trim: true },
+      bankName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      ifscCode: { type: String, trim: true },
+      upiId: { type: String, trim: true },
     },
   },
   {

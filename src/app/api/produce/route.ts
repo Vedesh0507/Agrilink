@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { ProduceListing, AuditLog, Notification } from '@/models';
+import { ProduceListing, BuyerRequirement, Match, AuditLog, Notification } from '@/models';
 import { authenticateUser, authorizeRoles } from '@/lib/auth';
 import { ProduceListingSchema } from '@/validators';
+import { MatchingService } from '@/services/matchingService';
 
 // GET produce listings (with search & filtering)
 export async function GET(req: NextRequest) {
@@ -77,7 +78,45 @@ export async function POST(req: NextRequest) {
       details: { product: listing.product, quantity: listing.quantity, price: listing.expectedPricePerUnit },
     });
 
-    return NextResponse.json({ success: true, data: listing }, { status: 201 });
+    // Bi-directional matching: trigger matching engine against all open buyer requirements
+    let matchedRequirementsCount = 0;
+    try {
+      const openRequirements = await BuyerRequirement.find({ status: 'OPEN' });
+      const allAvailableListings = await ProduceListing.find({
+        status: 'AVAILABLE',
+        availableQuantity: { $gt: 0 },
+      });
+
+      for (const reqDoc of openRequirements) {
+        const matches = MatchingService.generateMatches(reqDoc, allAvailableListings);
+        if (matches.length > 0) {
+          // Replace proposed matches for this requirement
+          await Match.deleteMany({ requirementId: reqDoc._id.toString(), status: 'PROPOSED' });
+          for (const m of matches) {
+            await Match.create(m);
+          }
+
+          // Check if newly created listing is part of this match to notify buyer
+          const includesNewListing = matches.some((m) =>
+            m.suppliers.some((s) => s.produceListingId === listing._id.toString())
+          );
+          if (includesNewListing) {
+            matchedRequirementsCount++;
+            await Notification.create({
+              userId: reqDoc.buyerId,
+              title: 'Matching Producer Inventory Available!',
+              message: `${currentUser.name} listed ${listing.product} (${listing.quantity} kg) matching your procurement requirement for ${reqDoc.product}.`,
+              type: 'MATCH',
+              link: `/buyer?tab=matches&requirementId=${reqDoc._id}`,
+            });
+          }
+        }
+      }
+    } catch (matchErr) {
+      console.error('Error generating bi-directional matches on produce create:', matchErr);
+    }
+
+    return NextResponse.json({ success: true, data: listing, matchedRequirementsCount }, { status: 201 });
   } catch (err: any) {
     console.error('Create produce error:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

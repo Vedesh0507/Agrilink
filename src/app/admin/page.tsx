@@ -153,8 +153,8 @@ export default function AdminPortalPage() {
           <div className="max-w-md mx-auto py-16">
             <div className="bg-black text-white p-8 rounded-3xl border border-neutral-800 shadow-2xl space-y-6">
               <div className="text-center space-y-2">
-                <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-700 text-agri-orange-500 flex items-center justify-center mx-auto">
-                  <Lock className="w-7 h-7" />
+                <div className="w-16 h-16 rounded-2xl bg-white p-1 border border-neutral-700 shadow-md flex items-center justify-center mx-auto overflow-hidden">
+                  <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
                 </div>
                 <h2 className="text-xl font-black tracking-tight text-white">
                   Administrator Access Gate

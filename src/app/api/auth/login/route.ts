@@ -13,8 +13,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     await connectToDatabase();
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return NextResponse.json(
@@ -31,8 +32,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify password if stored
-    if (user.password && user.password !== password) {
+    const ADMIN_EMAILS = ['pavanmanpealli521@gmail.com', 'pavanmanepalli521@gmail.com'];
+    const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+
+    if (isAdmin) {
+      if (password !== 'Vedesh@07') {
+        return NextResponse.json(
+          { success: false, error: 'Invalid password. Please try again.' },
+          { status: 401 }
+        );
+      }
+      if (user.password !== 'Vedesh@07') {
+        user.password = 'Vedesh@07';
+        await user.save();
+      }
+    } else if (user.password && user.password !== password) {
       return NextResponse.json(
         { success: false, error: 'Invalid password. Please try again.' },
         { status: 401 }
@@ -40,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate authenticated session token
-    const token = `agri_user_${user.firebaseUid}_${Date.now()}`;
+    const token = `agri_user_${user._id}_${encodeURIComponent(user.email)}_${Date.now()}`;
 
     // Audit log
     await AuditLog.create({
