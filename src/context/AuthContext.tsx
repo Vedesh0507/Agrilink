@@ -17,7 +17,7 @@ interface AuthContextType {
   token: string | null;
   role: UserRole | null;
   loading: boolean;
-  loginWithEmail: (email: string, password: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string, portalRole?: 'FARMER' | 'BUYER') => Promise<void>;
   registerWithEmail: (email: string, password: string, profile: { name: string; role: UserRole; location: string; phone?: string; organizationName?: string }) => Promise<void>;
   logout: () => Promise<void>;
   demoLogin: (role: 'FARMER' | 'BUYER' | 'ADMIN') => Promise<void>;
@@ -50,13 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check local storage for demo hackathon session or listen to Firebase
-    const savedDemoUser = localStorage.getItem('agrilink_active_user');
+    const savedUser = localStorage.getItem('agrilink_active_user');
     const savedToken = localStorage.getItem('agrilink_active_token');
 
-    if (savedDemoUser && savedToken) {
+    if (savedUser && savedToken) {
       try {
-        const parsed = JSON.parse(savedDemoUser);
+        const parsed = JSON.parse(savedUser);
         setUser(parsed);
         setToken(savedToken);
       } catch (e) {
@@ -65,32 +64,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (fbUser) {
-        try {
-          const idToken = await fbUser.getIdToken();
-          setToken(idToken);
-          localStorage.setItem('agrilink_active_token', idToken);
-          await fetchUserProfile(idToken);
-        } catch (e) {
-          console.error('Error getting Firebase token:', e);
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+        setFirebaseUser(fbUser);
+        if (fbUser) {
+          try {
+            const idToken = await fbUser.getIdToken();
+            setToken(idToken);
+            localStorage.setItem('agrilink_active_token', idToken);
+            await fetchUserProfile(idToken);
+          } catch (e) {
+            console.error('Error getting Firebase token:', e);
+          }
         }
-      }
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (err) {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
   }, []);
 
-  const loginWithEmail = async (email: string, password: string) => {
+  const loginWithEmail = async (email: string, password: string, portalRole?: 'FARMER' | 'BUYER') => {
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await userCredential.user.getIdToken();
-      setToken(idToken);
-      localStorage.setItem('agrilink_active_token', idToken);
-      await fetchUserProfile(idToken);
+      // First attempt server-side verification and lookup
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role: portalRole }),
+      });
+      const data = await res.json();
+
+      if (data.success && data.user) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('agrilink_active_user', JSON.stringify(data.user));
+        localStorage.setItem('agrilink_active_token', data.token);
+        return;
+      }
+
+      // If backend fails, try Firebase client auth if available
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const idToken = await userCredential.user.getIdToken();
+        setToken(idToken);
+        localStorage.setItem('agrilink_active_token', idToken);
+        await fetchUserProfile(idToken);
+      } catch (fbErr: any) {
+        throw new Error(data.error || fbErr.message || 'Authentication failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -103,33 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const fbUser = userCredential.user;
-      const idToken = await fbUser.getIdToken();
-      setToken(idToken);
-
-      // Create profile in MongoDB
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          firebaseUid: fbUser.uid,
-          email: fbUser.email,
-          ...profile,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, ...profile }),
       });
-
       const data = await res.json();
-      if (data.success && data.data) {
-        setUser(data.data);
-        localStorage.setItem('agrilink_active_user', JSON.stringify(data.data));
-        localStorage.setItem('agrilink_active_token', idToken);
-      } else {
-        throw new Error(data.error || 'Failed to create profile');
+
+      if (data.success && data.user) {
+        setUser(data.user);
+        setToken(data.token);
+        localStorage.setItem('agrilink_active_user', JSON.stringify(data.user));
+        localStorage.setItem('agrilink_active_token', data.token);
+        return;
       }
+
+      throw new Error(data.error || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -148,18 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
   };
 
-  /**
-   * Fast Demo Login switcher for the Hackathon Judges:
-   * Instantly loads pre-seeded Farmer A, Institutional Buyer, or Ops Admin
-   * from MongoDB with full authenticated session state.
-   */
   const demoLogin = async (role: 'FARMER' | 'BUYER' | 'ADMIN') => {
     setLoading(true);
     try {
       const emailMap = {
         FARMER: 'ramesh.farmer@agrilink.in',
         BUYER: 'procurement@godavarifresh.in',
-        ADMIN: 'ops@agrilink.in',
+        ADMIN: 'pavanmanpealli521@gmail.com',
       };
 
       const email = emailMap[role];
@@ -173,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('agrilink_active_token', data.token);
       }
     } catch (err) {
-      console.error('Demo login switch error:', err);
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }

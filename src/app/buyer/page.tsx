@@ -99,14 +99,10 @@ export default function BuyerDashboard() {
   };
 
   useEffect(() => {
-    if (!user) {
-      demoLogin('BUYER');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user && token) {
+    if (user && token && (user.role === 'BUYER' || user.role === 'ADMIN')) {
       fetchData();
+    } else {
+      setLoading(false);
     }
   }, [user, token]);
 
@@ -226,20 +222,55 @@ export default function BuyerDashboard() {
   const activeQuotations = quotations.filter((q) => q.status === 'REQUESTED' || q.status === 'COUNTERED');
   const ordersInTransit = orders.filter((o) => o.orderStatus === 'IN_TRANSIT');
 
+  const isAuthorized = user && (user.role === 'BUYER' || user.role === 'ADMIN');
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-black bg-neutral-100 px-3 py-1 rounded-full border border-neutral-300 mb-2">
-              <Building2 className="w-3.5 h-3.5" /> Institutional Procurement Portal
+      {!isAuthorized ? (
+        <div className="flex-1 flex items-center justify-center px-4 py-16">
+          <div className="max-w-md w-full p-8 rounded-3xl bg-white border border-neutral-200 shadow-xl text-center space-y-6">
+            <div className="w-14 h-14 rounded-2xl bg-black text-white flex items-center justify-center mx-auto">
+              <Building2 className="w-7 h-7 text-agri-orange-500" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-black">
-              {user?.name || 'Godavari Fresh Foods & Supermarkets'}
-            </h1>
+            <div>
+              <h2 className="text-xl font-black text-black">Buyer Portal Access Required</h2>
+              <p className="text-xs text-neutral-500 mt-1">
+                Please sign in with your verified institutional procurement account to define demand, access smart supplier matching, and execute purchase orders.
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <a
+                href="/login?role=BUYER"
+                className="w-full py-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
+              >
+                Sign In as Buyer <ArrowRight className="w-4 h-4" />
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  await demoLogin('BUYER');
+                }}
+                className="w-full py-2.5 bg-agri-orange-50 hover:bg-agri-orange-100 text-agri-orange-700 font-bold rounded-xl text-xs border border-agri-orange-200 transition-colors"
+              >
+                Quick Access with Sample Buyer Account (Godavari Fresh)
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Dashboard Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-black bg-neutral-100 px-3 py-1 rounded-full border border-neutral-300 mb-2">
+                <Building2 className="w-3.5 h-3.5" /> Institutional Procurement Portal
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-black">
+                {user?.name}
+              </h1>
             <p className="text-xs text-neutral-500 mt-0.5">
               Wholesale Sourcing Hub • Vijayawada Central Distribution Center
             </p>
@@ -1066,6 +1097,7 @@ export default function BuyerDashboard() {
           </div>
         )}
       </div>
+    )}
 
       {/* CREATE REQUIREMENT MODAL */}
       {showAddReqModal && (

@@ -4,6 +4,7 @@ import { UserRole } from '@/types';
 export interface IUserDocument extends Document {
   firebaseUid: string;
   email: string;
+  password?: string;
   name: string;
   phone?: string;
   role: UserRole;
@@ -28,6 +29,10 @@ const UserSchema = new Schema<IUserDocument>(
       lowercase: true,
       trim: true,
       index: true,
+    },
+    password: {
+      type: String,
+      select: true,
     },
     name: {
       type: String,

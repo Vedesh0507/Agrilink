@@ -37,6 +37,10 @@ export async function authenticateUser(
     if (idToken.startsWith('admin_session_')) {
       firebaseUid = 'admin_pavan_uid';
       email = 'pavanmanpealli521@gmail.com';
+    } else if (idToken.startsWith('agri_user_')) {
+      const parts = idToken.split('_');
+      // format: agri_user_<uid>_<timestamp>
+      firebaseUid = parts.slice(2, parts.length - 1).join('_') || parts[2];
     } else if (idToken.startsWith('demo_token_')) {
       firebaseUid = idToken.replace('demo_token_', '');
     } else {

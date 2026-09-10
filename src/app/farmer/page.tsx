@@ -92,15 +92,11 @@ export default function FarmerDashboard() {
   };
 
   useEffect(() => {
-    if (!user) {
-      // Auto switch to Farmer A for seamless presentation if guest
-      demoLogin('FARMER');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user && token) {
+    // Only fetch if authenticated as farmer or admin
+    if (user && token && (user.role === 'FARMER' || user.role === 'ADMIN')) {
       fetchData();
+    } else {
+      setLoading(false);
     }
   }, [user, token]);
 
@@ -233,20 +229,55 @@ export default function FarmerDashboard() {
   const pendingQuotations = quotations.filter((q) => q.status === 'REQUESTED' || q.status === 'COUNTERED');
   const activeOrders = orders.filter((o) => o.orderStatus !== 'DELIVERED' && o.orderStatus !== 'CANCELLED');
 
+  const isAuthorized = user && (user.role === 'FARMER' || user.role === 'ADMIN');
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-agri-orange-600 bg-agri-orange-50 px-3 py-1 rounded-full border border-agri-orange-200 mb-2">
-              <Wheat className="w-3.5 h-3.5" /> Producer & Farmer Portal
+      {!isAuthorized ? (
+        <div className="flex-1 flex items-center justify-center px-4 py-16">
+          <div className="max-w-md w-full p-8 rounded-3xl bg-white border border-neutral-200 shadow-xl text-center space-y-6">
+            <div className="w-14 h-14 rounded-2xl bg-agri-orange-50 border border-agri-orange-200 text-agri-orange-600 flex items-center justify-center mx-auto">
+              <Wheat className="w-7 h-7" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-black">
-              {user?.name || 'Farmer Dashboard'}
-            </h1>
+            <div>
+              <h2 className="text-xl font-black text-black">Farmer Portal Access Required</h2>
+              <p className="text-xs text-neutral-500 mt-1">
+                Please sign in to your verified agricultural producer account to list crops, review buyer orders, and submit quotations.
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <a
+                href="/login?role=FARMER"
+                className="w-full py-3 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors"
+              >
+                Sign In as Farmer <ArrowRight className="w-4 h-4" />
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  await demoLogin('FARMER');
+                }}
+                className="w-full py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-xl text-xs border border-neutral-300 transition-colors"
+              >
+                Quick Access with Sample Farmer Account (Ramesh Patel)
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Dashboard Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-agri-orange-600 bg-agri-orange-50 px-3 py-1 rounded-full border border-agri-orange-200 mb-2">
+                <Wheat className="w-3.5 h-3.5" /> Producer & Farmer Portal
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-black">
+                {user?.name}
+              </h1>
             <p className="text-xs text-neutral-500 mt-0.5">
               {user?.location || 'Vijayawada Region'} • Krishna River Farmers Collective
             </p>
@@ -840,6 +871,7 @@ export default function FarmerDashboard() {
           </div>
         )}
       </div>
+    )}
 
       {/* ADD PRODUCE MODAL */}
       {showAddProduceModal && (
