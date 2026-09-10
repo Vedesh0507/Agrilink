@@ -673,8 +673,8 @@ export default function AdminPortalPage() {
         <div className="flex-1 flex items-center justify-center px-4 py-16">
           <div className="max-w-md w-full bg-black text-white p-8 sm:p-10 rounded-3xl border border-neutral-800 shadow-2xl space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-white p-1 border border-neutral-700 shadow-md flex items-center justify-center mx-auto overflow-hidden">
-                <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+              <div className="w-16 h-16 rounded-2xl bg-white p-1 border border-neutral-700 shadow-md flex items-center justify-center mx-auto overflow-hidden shrink-0" style={{ width: '64px', height: '64px', minWidth: '64px', minHeight: '64px' }}>
+                <img src="/logo.png" alt="AgriLink Logo" width={64} height={64} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               </div>
               <h2 className="text-xl font-black tracking-tight text-white">
                 Platform Operations Command Center
@@ -2773,8 +2773,8 @@ export default function AdminPortalPage() {
           <div className="bg-white rounded-3xl max-w-2xl w-full p-8 space-y-6 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white p-1 border border-neutral-200 flex items-center justify-center overflow-hidden">
-                  <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+                <div className="w-10 h-10 rounded-xl bg-white p-1 border border-neutral-200 flex items-center justify-center overflow-hidden shrink-0" style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px' }}>
+                  <img src="/logo.png" alt="AgriLink Logo" width={40} height={40} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 </div>
                 <div>
                   <h2 className="font-black text-base text-black">TAX INVOICE</h2>

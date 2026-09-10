@@ -202,8 +202,8 @@ export default function LoginPage() {
           {/* Main Card */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-neutral-200 shadow-sm">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center p-1 mx-auto mb-3 border border-neutral-200 shadow-sm overflow-hidden">
-                <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center p-1 mx-auto mb-3 border border-neutral-200 shadow-sm overflow-hidden shrink-0" style={{ width: '64px', height: '64px', minWidth: '64px', minHeight: '64px' }}>
+                <img src="/logo.png" alt="AgriLink Logo" width={64} height={64} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               </div>
               <h2 className="text-2xl font-black text-black">
                 {isRegister ? 'Create AgriLink Commercial Account' : 'Sign In to AgriLink'}

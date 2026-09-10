@@ -35,8 +35,8 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center space-y-6">
             {/* Platform Emblem */}
             <div className="inline-flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-neutral-200 shadow-sm">
-              <div className="w-8 h-8 rounded-xl bg-white p-0.5 overflow-hidden flex items-center justify-center">
-                <img src="/logo.png" alt="AgriLink" className="w-full h-full object-contain" />
+              <div className="w-8 h-8 rounded-xl bg-white p-0.5 overflow-hidden flex items-center justify-center shrink-0" style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}>
+                <img src="/logo.png" alt="AgriLink" width={32} height={32} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               </div>
               <span className="text-xs font-black tracking-wide text-black uppercase">
                 Agri<span className="text-agri-orange-500">Link</span> Enterprise Platform
@@ -361,8 +361,8 @@ export default function LandingPage() {
       {/* 5. FINAL ACTION BANNER */}
       <section className="py-16 bg-black text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto overflow-hidden">
-            <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+          <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto overflow-hidden shrink-0" style={{ width: '56px', height: '56px', minWidth: '56px', minHeight: '56px' }}>
+            <img src="/logo.png" alt="AgriLink Logo" width={56} height={56} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             Ready to Modernize Your Agricultural Supply Chain?

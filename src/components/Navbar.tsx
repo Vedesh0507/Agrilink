@@ -17,8 +17,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2">
         {/* Left: Brand Logo & Title */}
         <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
-          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-white flex items-center justify-center p-1 shadow-sm border border-neutral-200 overflow-hidden">
-            <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-white flex items-center justify-center p-1 shadow-sm border border-neutral-200 overflow-hidden shrink-0" style={{ width: '40px', height: '40px', minWidth: '40px', minHeight: '40px' }}>
+            <img src="/logo.png" alt="AgriLink Logo" width={40} height={40} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl sm:text-2xl tracking-tight text-black flex items-center">

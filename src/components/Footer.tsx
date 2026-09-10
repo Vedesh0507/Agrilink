@@ -8,8 +8,8 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-neutral-800">
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-0.5 overflow-hidden">
-                <img src="/logo.png" alt="AgriLink Logo" className="w-full h-full object-contain" />
+              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-0.5 overflow-hidden shrink-0" style={{ width: '36px', height: '36px', minWidth: '36px', minHeight: '36px' }}>
+                <img src="/logo.png" alt="AgriLink Logo" width={36} height={36} className="w-full h-full object-contain" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               </div>
               <span className="font-bold text-xl tracking-tight text-white">
                 Agri<span className="text-agri-orange-500">Link</span>
