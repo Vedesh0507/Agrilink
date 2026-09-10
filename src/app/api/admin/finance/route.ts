@@ -28,61 +28,7 @@ export async function GET(req: NextRequest) {
 
     let entries = await LedgerEntry.find(filter).sort({ createdAt: -1 }).limit(100).lean();
 
-    // If empty, generate initial baseline entries from existing orders so admin sees populated ledger immediately
-    if (entries.length === 0) {
-      const orders = await Order.find({ orderStatus: { $ne: 'CANCELLED' } }).limit(5).lean();
-      for (const ord of orders) {
-        const entryNum = `LEDGER-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
-        const commission = Math.round(ord.totalValue * 0.025);
-        const payout = ord.totalValue - commission;
-        const firstItem = ord.items && ord.items[0];
-
-        await LedgerEntry.create([
-          {
-            entryNumber: entryNum,
-            orderId: ord._id.toString(),
-            orderNumber: ord.orderNumber,
-            type: 'PAYMENT_RECORDED',
-            amount: ord.totalValue,
-            currency: 'INR',
-            status: 'SETTLED',
-            payerId: ord.buyerId,
-            payerName: ord.buyerName,
-            payeeName: 'AgriLink Clearing Account',
-            paymentMethod: 'ESCROW_SETTLEMENT',
-            notes: `Buyer settlement received for Order #${ord.orderNumber}`,
-          },
-          {
-            entryNumber: `${entryNum}-PAYOUT`,
-            orderId: ord._id.toString(),
-            orderNumber: ord.orderNumber,
-            type: 'SUPPLIER_PAYOUT',
-            amount: payout,
-            currency: 'INR',
-            status: ord.orderStatus === 'DELIVERED' ? 'SETTLED' : 'PENDING',
-            payerName: 'AgriLink Clearing Account',
-            payeeId: firstItem?.supplierId || (ord.supplierIds && ord.supplierIds[0]) || 'farmer_clearing',
-            payeeName: firstItem?.supplierName || 'Primary Farm Supplier',
-            paymentMethod: 'NEFT_RTGS',
-            notes: `Fulfillment payout allocation for ${firstItem?.product || 'Produce'}`,
-          },
-          {
-            entryNumber: `${entryNum}-COMM`,
-            orderId: ord._id.toString(),
-            orderNumber: ord.orderNumber,
-            type: 'PLATFORM_COMMISSION',
-            amount: commission,
-            currency: 'INR',
-            status: 'RECORDED',
-            payeeName: 'AgriLink Platform Treasury',
-            notes: `Platform facilitation commission (2.5%)`,
-          },
-        ]);
-      }
-      entries = await LedgerEntry.find(filter).sort({ createdAt: -1 }).limit(100).lean();
-    }
-
-    // Compute ledger aggregates
+    // Compute real ledger aggregates from database
     let totalInflow = 0;
     let totalPayouts = 0;
     let totalCommission = 0;

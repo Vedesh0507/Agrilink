@@ -74,6 +74,17 @@ interface NavSection {
   items: { id: AdminModuleId; label: string; badge?: number | string }[];
 }
 
+const getCommodityHsn = (commodityName?: string) => {
+  const norm = (commodityName || '').toLowerCase();
+  if (norm.includes('onion') || norm.includes('allium') || norm.includes('garlic')) return { hsn: '0703', desc: 'Onions, shallots, garlic, leeks' };
+  if (norm.includes('tomato')) return { hsn: '0702', desc: 'Tomatoes, fresh or chilled' };
+  if (norm.includes('potato')) return { hsn: '0701', desc: 'Potatoes, fresh or chilled' };
+  if (norm.includes('chilli') || norm.includes('pepper') || norm.includes('mirchi')) return { hsn: '0904', desc: 'Chillies & peppers' };
+  if (norm.includes('carrot') || norm.includes('turnip')) return { hsn: '0706', desc: 'Carrots, turnips, root vegetables' };
+  if (norm.includes('cabbage') || norm.includes('cauliflower')) return { hsn: '0704', desc: 'Cabbages, cauliflowers' };
+  return { hsn: '0709', desc: 'Other fresh agricultural produce' };
+};
+
 export default function AdminPortalPage() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -1214,10 +1225,10 @@ export default function AdminPortalPage() {
                     <h3 className="font-extrabold text-sm text-black">Telemetry Checkpoints</h3>
                     <div className="space-y-2 text-xs">
                       {[
-                        { name: 'Core API Gateway', status: '200 OK', latency: '28ms', state: 'ONLINE' },
-                        { name: 'Knapsack 6-Factor Matching Daemon', status: 'READY', latency: '42ms', state: 'ONLINE' },
-                        { name: 'Idempotency Cache TTL Worker', status: 'ACTIVE', latency: '2ms', state: 'ONLINE' },
-                        { name: 'Immutable Audit Sink', status: 'SYNCED', latency: '19ms', state: 'ONLINE' },
+                        { name: 'Core API Gateway', status: '200 OK', latency: `${metrics?.systemHealth?.executionTimeMs || 12}ms`, state: 'ONLINE' },
+                        { name: 'MongoDB Atlas Ping', status: '200 OK', latency: `${metrics?.systemHealth?.databaseLatencyMs || 18}ms`, state: 'CONNECTED' },
+                        { name: 'Node.js V8 Engine Heap', status: 'HEALTHY', latency: `${metrics?.systemHealth?.memoryHeapUsedMB || 112}MB`, state: 'OPTIMAL' },
+                        { name: 'Cluster Process Uptime', status: 'RUNNING', latency: `${Math.round((metrics?.systemHealth?.nodeUptimeSeconds || 3600) / 60)} mins`, state: 'ACTIVE' },
                       ].map((item, idx) => (
                         <div
                           key={idx}
@@ -1481,11 +1492,13 @@ export default function AdminPortalPage() {
                               {item.email} • {item.location} • Submitted{' '}
                               {new Date(item.updatedAt || item.createdAt).toLocaleDateString()}
                             </div>
-                            {item.bankDetails && (
+                            {item.bankDetails ? (
                               <div className="text-[11px] font-mono text-neutral-400">
-                                Bank: {item.bankDetails.bankName || 'SBI'} • A/C:{' '}
-                                {item.bankDetails.accountNumber ? `••••${item.bankDetails.accountNumber.slice(-4)}` : 'Verified'}
+                                Bank: {item.bankDetails.bankName || 'Verified Bank'} • A/C:{' '}
+                                {item.bankDetails.accountNumber ? `••••${item.bankDetails.accountNumber.slice(-4)}` : 'Submitted'}
                               </div>
+                            ) : (
+                              <div className="text-[11px] text-neutral-400">Bank credentials pending submission</div>
                             )}
                           </div>
 
@@ -1531,16 +1544,30 @@ export default function AdminPortalPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-5 rounded-3xl bg-white border border-neutral-200">
                       <span className="text-[10px] font-bold text-neutral-400 uppercase">Platform Trust Index</span>
-                      <div className="text-3xl font-black text-green-600 mt-1">96.8%</div>
+                      <div className="text-3xl font-black text-green-600 mt-1">
+                        {metrics?.counts?.totalOrders
+                          ? `${Math.round(
+                              ((metrics.counts.totalOrders - (metrics.counts.totalDisputes || 0)) /
+                                metrics.counts.totalOrders) *
+                                100
+                            )}%`
+                          : '100%'}
+                      </div>
                       <p className="text-xs text-neutral-500 mt-1">Fulfillment adherence rate</p>
                     </div>
 
                     <div className="p-5 rounded-3xl bg-white border border-neutral-200">
                       <span className="text-[10px] font-bold text-neutral-400 uppercase">Dispute Frequency</span>
                       <div className="text-3xl font-black text-black mt-1">
-                        {metrics?.counts?.totalDisputes || 1}
+                        {metrics?.counts?.totalDisputes || 0}
                       </div>
-                      <p className="text-xs text-neutral-500 mt-1">Out of {metrics?.counts?.totalOrders || 5} orders (20%)</p>
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Out of {metrics?.counts?.totalOrders || 0} orders (
+                        {metrics?.counts?.totalOrders
+                          ? Math.round(((metrics.counts.totalDisputes || 0) / metrics.counts.totalOrders) * 100)
+                          : 0}
+                        %)
+                      </p>
                     </div>
 
                     <div className="p-5 rounded-3xl bg-white border border-neutral-200">
@@ -1977,43 +2004,71 @@ export default function AdminPortalPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    {metrics?.ordersData
-                      ?.filter((o: any) => o.orderStatus !== 'DELIVERED' && o.orderStatus !== 'CANCELLED')
-                      .map((ord: any) => (
-                        <div
-                          key={ord._id}
-                          className="p-5 rounded-3xl bg-white border border-neutral-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-black text-sm">{ord.orderNumber}</span>
-                              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-                                In Transit Monitor
-                              </span>
-                            </div>
-                            <div className="text-xs text-neutral-600">
-                              Buyer: <strong>{ord.buyerName}</strong> • Destination: {ord.deliveryLocation} • Total:{' '}
-                              <strong>{formatQuantity(ord.totalQuantity)}</strong>
-                            </div>
-                            <div className="text-[11px] text-neutral-400">
-                              Expected Date: {new Date(ord.deliveryDate).toLocaleDateString()}
-                            </div>
-                          </div>
+                  {(() => {
+                    const now = new Date();
+                    const delayedOrders =
+                      metrics?.ordersData?.filter(
+                        (o: any) =>
+                          o.orderStatus !== 'DELIVERED' &&
+                          o.orderStatus !== 'CANCELLED' &&
+                          new Date(o.deliveryDate) < now
+                      ) || [];
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                alert(`Logistics dispatch notification re-sent to transporter for Order ${ord.orderNumber}`);
-                              }}
-                              className="px-3 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-                            >
-                              <Send className="w-3.5 h-3.5" /> Transporter Ping
-                            </button>
-                          </div>
+                    if (delayedOrders.length === 0) {
+                      return (
+                        <div className="p-8 rounded-3xl bg-white border border-neutral-200 text-center text-neutral-500 text-xs">
+                          All active dispatches are currently moving on schedule. Zero deliveries have exceeded their promised delivery dates.
                         </div>
-                      ))}
-                  </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {delayedOrders.map((ord: any) => {
+                          const daysOverdue = Math.max(
+                            1,
+                            Math.floor((now.getTime() - new Date(ord.deliveryDate).getTime()) / (1000 * 60 * 60 * 24))
+                          );
+                          return (
+                            <div
+                              key={ord._id}
+                              className="p-5 rounded-3xl bg-white border border-red-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-black text-black text-sm">{ord.orderNumber}</span>
+                                  <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold">
+                                    {daysOverdue} Days Overdue
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded bg-neutral-100 text-[10px] font-bold text-neutral-700">
+                                    {ord.orderStatus}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-neutral-600">
+                                  Buyer: <strong>{ord.buyerName}</strong> • Destination: {ord.deliveryLocation} • Total:{' '}
+                                  <strong>{formatQuantity(ord.totalQuantity)}</strong>
+                                </div>
+                                <div className="text-[11px] text-red-500 font-medium">
+                                  Promised Delivery Date: {new Date(ord.deliveryDate).toLocaleDateString()}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    alert(`Logistics priority dispatch ping sent for Order ${ord.orderNumber}`);
+                                  }}
+                                  className="px-3 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                                >
+                                  <Send className="w-3.5 h-3.5" /> Transporter Ping
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2046,32 +2101,31 @@ export default function AdminPortalPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-mono font-extrabold text-sm text-black">
-                                  {dsp.disputeNumber || 'DISP-1029'}
+                                  {dsp.disputeNumber}
                                 </span>
                                 <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold">
                                   {dsp.status}
                                 </span>
                                 <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 text-[10px] font-bold">
-                                  Order #{dsp.orderNumber || 'ORD-9281'}
+                                  Order #{dsp.orderNumber}
                                 </span>
                               </div>
                               <div className="text-xs text-neutral-500 mt-0.5">
-                                Initiated by: <strong>{dsp.initiatorName || 'Buyer Operations'}</strong> (
-                                {dsp.initiatorRole || 'BUYER'})
+                                Initiated by: <strong>{dsp.initiatorName}</strong> (
+                                {dsp.initiatorRole})
                               </div>
                             </div>
 
                             <div className="text-right">
                               <div className="text-[10px] font-bold text-neutral-400 uppercase">Claim Amount</div>
                               <div className="text-base font-black text-red-600">
-                                {formatCurrency(dsp.claimedAmount || 15000)}
+                                {formatCurrency(dsp.claimedAmount || 0)}
                               </div>
                             </div>
                           </div>
 
                           <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-100 text-xs text-neutral-700">
-                            <strong>Claim Details:</strong>{' '}
-                            {dsp.reason || 'Moisture content above 14% threshold on batch received at cold store.'}
+                            <strong>Claim Details:</strong> {dsp.reason}
                           </div>
 
                           <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
@@ -2079,7 +2133,7 @@ export default function AdminPortalPage() {
                               <button
                                 onClick={() => {
                                   setSelectedItem(dsp);
-                                  setActionAmountInput(dsp.claimedAmount || 15000);
+                                  setActionAmountInput(dsp.claimedAmount || 0);
                                   setModalType('RESOLVE_DISPUTE');
                                 }}
                                 className="px-4 py-1.5 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-colors"
@@ -2252,7 +2306,14 @@ export default function AdminPortalPage() {
                           Billed to: <strong>{ord.buyerName}</strong> • Delivery: {ord.deliveryLocation}
                         </div>
                         <div className="pt-2 border-t border-neutral-100 flex items-center justify-between">
-                          <span className="text-[11px] text-neutral-400 font-mono">HSN: 0703 (Onion/Alliums)</span>
+                          {(() => {
+                            const hsnInfo = getCommodityHsn(ord.items?.[0]?.product);
+                            return (
+                              <span className="text-[11px] text-neutral-400 font-mono">
+                                HSN: {hsnInfo.hsn} ({ord.items?.[0]?.product || 'Produce'})
+                              </span>
+                            );
+                          })()}
                           <button
                             onClick={() => setActiveInvoiceOrder(ord)}
                             className="px-3 py-1 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition-colors flex items-center gap-1"
@@ -2740,7 +2801,7 @@ export default function AdminPortalPage() {
                 <div className="text-[10px] font-bold uppercase text-neutral-400">Buyer Information</div>
                 <div className="font-bold text-black">{activeInvoiceOrder.buyerName}</div>
                 <div className="text-neutral-600">Destination: {activeInvoiceOrder.deliveryLocation}</div>
-                <div className="text-neutral-600">State Code: 36 (Telangana)</div>
+                <div className="text-neutral-600">Supply Route: Direct Farm Hub Delivery</div>
               </div>
             </div>
 
@@ -2757,7 +2818,9 @@ export default function AdminPortalPage() {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   <tr>
-                    <td className="p-3 font-mono">0703</td>
+                    <td className="p-3 font-mono">
+                      {getCommodityHsn(activeInvoiceOrder.items?.[0]?.product).hsn}
+                    </td>
                     <td className="p-3 font-bold text-black">
                       {activeInvoiceOrder.items?.[0]?.product || 'Fresh Produce'} (Grade{' '}
                       {activeInvoiceOrder.items?.[0]?.qualityGrade || 'A'})

@@ -26,37 +26,7 @@ export async function GET(req: NextRequest) {
     if (status && status !== 'ALL') filter.status = status;
     if (priority && priority !== 'ALL') filter.priority = priority;
 
-    let tickets = await SupportTicket.find(filter).sort({ createdAt: -1 }).limit(50).lean();
-
-    // Generate baseline tickets if empty
-    if (tickets.length === 0) {
-      await SupportTicket.create([
-        {
-          ticketNumber: 'TICK-8021',
-          userId: 'usr_buyer_demo',
-          userName: 'Reliance Retail Ops',
-          userRole: 'BUYER',
-          category: 'DELIVERY',
-          subject: 'Vehicle dispatch delay on Order #ORD-9281',
-          description: 'Logistics truck reported 4 hours delayed due to highway checkpoint. Need updated ETA.',
-          priority: 'HIGH',
-          status: 'OPEN',
-        },
-        {
-          ticketNumber: 'TICK-8022',
-          userId: 'usr_farmer_demo',
-          userName: 'Ramesh Kumar (Guntur)',
-          userRole: 'FARMER',
-          category: 'PAYMENT',
-          subject: 'Settlement confirmation query for Lot #LOT-4412',
-          description: 'Produce lot was inspected yesterday. Please confirm when the clearing account releases funds.',
-          priority: 'MEDIUM',
-          status: 'IN_PROGRESS',
-          assignedTo: 'Finance Ops Desk',
-        },
-      ]);
-      tickets = await SupportTicket.find(filter).sort({ createdAt: -1 }).limit(50).lean();
-    }
+    const tickets = await SupportTicket.find(filter).sort({ createdAt: -1 }).limit(50).lean();
 
     return NextResponse.json({ success: true, data: tickets });
   } catch (err: any) {

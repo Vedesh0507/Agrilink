@@ -104,14 +104,19 @@ export async function GET(req: NextRequest) {
     const commissionPercent = platformConfig?.platformCommissionPercent || 2.5;
     const platformRevenue = Math.round((totalGMV * commissionPercent) / 100);
 
-    // Calculate unfulfilled shortfall requirements
+    // Calculate unfulfilled shortfall requirements based on real product-specific inventory
     const openReqs = await BuyerRequirement.find({ status: 'OPEN' }).lean();
     let unfulfilledDemandCount = 0;
-    openReqs.forEach((r: any) => {
-      if ((r.requiredQuantity || 0) > totalAvailableSupplyKg) {
+    for (const r of openReqs) {
+      const availableAgg = await ProduceListing.aggregate([
+        { $match: { status: 'AVAILABLE', product: { $regex: new RegExp(`^${r.product}$`, 'i') } } },
+        { $group: { _id: null, total: { $sum: '$availableQuantity' } } },
+      ]);
+      const availableForProduct = availableAgg[0]?.total || 0;
+      if ((r.requiredQuantity || 0) > availableForProduct) {
         unfulfilledDemandCount++;
       }
-    });
+    }
 
     const executionTimeMs = Date.now() - startTime;
 
@@ -136,7 +141,7 @@ export async function GET(req: NextRequest) {
           commissionPercent,
         },
         attentionAlerts: {
-          unfulfilledDemandCount: Math.max(unfulfilledDemandCount, openReqs.length > 0 ? 1 : 0),
+          unfulfilledDemandCount,
           delayedOrdersCount,
           openDisputesCount,
           pendingQuotationsCount,
