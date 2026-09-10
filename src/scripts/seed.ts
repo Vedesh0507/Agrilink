@@ -117,11 +117,11 @@ export async function runDatabaseSeed() {
     location: 'Vijayawada, AP',
   });
 
-  // 6. Ops Admin
+  // 6. Platform Administrator
   const adminUser = await User.create({
-    firebaseUid: 'admin_agrilink_uid',
-    email: 'ops@agrilink.in',
-    name: 'AgriLink Platform Operations',
+    firebaseUid: 'admin_pavan_uid',
+    email: 'pavanmanpealli521@gmail.com',
+    name: 'Pavan Manpealli (Platform Administrator)',
     phone: '+91 99999 00000',
     role: 'ADMIN',
     location: 'Vijayawada Headquarters',

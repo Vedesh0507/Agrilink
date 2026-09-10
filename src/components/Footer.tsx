@@ -19,7 +19,7 @@ export default function Footer() {
               B2B Agricultural Marketplace & Supply Chain Platform connecting fragmented farm yield with institutional business demand.
             </p>
             <div className="text-xs text-neutral-500">
-              Swarnandhra College 24-Hour Hackathon 2026
+              Enterprise Agricultural Supply Chain Network
             </div>
           </div>
 
@@ -44,12 +44,12 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm text-neutral-400">
               <li>
                 <Link href="/farmer" className="hover:text-agri-orange-500 transition-colors">
-                  Farmer & Producer Dashboard
+                  Farmer & Producer Portal
                 </Link>
               </li>
               <li>
                 <Link href="/buyer" className="hover:text-agri-orange-500 transition-colors">
-                  Institutional Buyer Dashboard
+                  Institutional Buyer Portal
                 </Link>
               </li>
               <li>
@@ -62,25 +62,25 @@ export default function Footer() {
 
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wider text-neutral-300 mb-4">
-              Design & Architecture
+              Enterprise Technology
             </h4>
             <p className="text-xs text-neutral-400 leading-relaxed">
-              Strict Tri-Color UI: Orange, Black, White.
-              <br />
               Deterministic Explainable Matching Engine.
               <br />
-              Cryptographic Firebase Token Verification & MongoDB Atlas Data Layer.
+              Multi-Supplier Yield Aggregation Protocol.
+              <br />
+              Enterprise MongoDB Atlas Cloud Infrastructure.
             </p>
           </div>
         </div>
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 gap-4">
           <div>
-            © 2026 AgriLink B2B Agricultural Platform. Built for 24-Hour Swarnandhra Hackathon.
+            © {new Date().getFullYear()} AgriLink B2B Agricultural Platform. All rights reserved.
           </div>
           <div className="flex items-center gap-6">
-            <span>Vijayawada / Krishna Agri Hub</span>
-            <span>Enterprise Grade MVP</span>
+            <span>Andhra Pradesh Agricultural Corridor</span>
+            <span>Enterprise B2B SaaS</span>
           </div>
         </div>
       </div>

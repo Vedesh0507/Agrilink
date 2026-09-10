@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { UserRole } from '@/types';
-import { UserCheck, Sparkles, ShieldAlert, ArrowRight, Lock, Mail, User, MapPin } from 'lucide-react';
+import { Lock, Mail, User, MapPin, Building2, Wheat, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +16,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [userRole, setUserRole] = useState<UserRole>('FARMER');
+  const [userRole, setUserRole] = useState<'FARMER' | 'BUYER'>('FARMER');
   const [location, setLocation] = useState('Vijayawada, AP');
   const [phone, setPhone] = useState('');
   const [organizationName, setOrganizationName] = useState('');
@@ -42,25 +42,23 @@ export default function LoginPage() {
       }
 
       if (userRole === 'FARMER' || role === 'FARMER') router.push('/farmer');
-      else if (userRole === 'BUYER' || role === 'BUYER') router.push('/buyer');
-      else router.push('/ops-admin');
+      else router.push('/buyer');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication failed. Please check credentials.');
+      setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDemo = async (targetRole: 'FARMER' | 'BUYER' | 'ADMIN') => {
+  const handleQuickPortalLogin = async (targetRole: 'FARMER' | 'BUYER') => {
     setErrorMsg('');
     setSubmitting(true);
     try {
       await demoLogin(targetRole);
       if (targetRole === 'FARMER') router.push('/farmer');
-      else if (targetRole === 'BUYER') router.push('/buyer');
-      else if (targetRole === 'ADMIN') router.push('/ops-admin');
+      else router.push('/buyer');
     } catch (err: any) {
-      setErrorMsg('Demo login failed: ' + err.message);
+      setErrorMsg('Login failed: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -72,70 +70,56 @@ export default function LoginPage() {
 
       <div className="flex-1 flex items-center justify-center px-4 py-16">
         <div className="max-w-md w-full space-y-6">
-          {/* Quick Demo Access Header for Hackathon */}
-          <div className="bg-black text-white p-5 rounded-3xl border border-neutral-800 shadow-xl">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-agri-orange-500" />
-              <span className="text-xs font-bold uppercase tracking-wider text-agri-orange-400">
-                Hackathon Instant Demo Access
-              </span>
-            </div>
-            <p className="text-xs text-neutral-300 leading-relaxed mb-4">
-              Select a pre-seeded authenticated persona to evaluate the full end-to-end workflow:
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemo('FARMER')}
-                disabled={submitting}
-                className="w-full py-2.5 px-3.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl text-xs font-semibold flex items-center justify-between border border-neutral-700 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-3.5 h-3.5 text-agri-orange-500" />
-                  <span>Farmer A (Ramesh Patel — 500 kg Tomato)</span>
-                </div>
-                <ArrowRight className="w-3 h-3 text-neutral-400" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemo('BUYER')}
-                disabled={submitting}
-                className="w-full py-2.5 px-3.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-3.5 h-3.5 text-white" />
-                  <span>Institutional Buyer (Godavari Fresh — 2,000 kg)</span>
-                </div>
-                <ArrowRight className="w-3 h-3 text-white" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemo('ADMIN')}
-                disabled={submitting}
-                className="w-full py-2 px-3.5 bg-neutral-950 hover:bg-black text-neutral-400 hover:text-white rounded-xl text-[11px] font-medium flex items-center justify-between border border-neutral-800 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-3 h-3 text-neutral-400" />
-                  <span>Platform Operations Admin</span>
-                </div>
-                <ArrowRight className="w-3 h-3 text-neutral-500" />
-              </button>
-            </div>
-          </div>
-
-          {/* Form Card */}
+          {/* Main Card */}
           <div className="bg-white p-8 rounded-3xl border border-neutral-200 shadow-sm">
             <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-agri-orange-500 font-black text-2xl mx-auto mb-3">
+                A
+              </div>
               <h2 className="text-2xl font-black text-black">
                 {isRegister ? 'Create AgriLink Account' : 'Sign In to AgriLink'}
               </h2>
               <p className="text-xs text-neutral-500 mt-1">
                 {isRegister
                   ? 'Join as an Agricultural Producer or Institutional Buyer'
-                  : 'Enter your credentials to access your commercial dashboard'}
+                  : 'Access your commercial procurement portal'}
               </p>
+            </div>
+
+            {/* Quick Persona Switches for testing */}
+            <div className="grid grid-cols-2 gap-2 mb-6">
+              <button
+                type="button"
+                onClick={() => handleQuickPortalLogin('FARMER')}
+                disabled={submitting}
+                className="p-3 rounded-2xl bg-neutral-50 border border-neutral-200 hover:border-agri-orange-500 text-left transition-all group"
+              >
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-neutral-500 mb-1 group-hover:text-agri-orange-600">
+                  <Wheat className="w-3.5 h-3.5 text-agri-orange-500" /> Farmer Account
+                </div>
+                <div className="font-extrabold text-xs text-black">Ramesh Patel</div>
+                <div className="text-[10px] text-neutral-400">500 kg Tomato lot</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickPortalLogin('BUYER')}
+                disabled={submitting}
+                className="p-3 rounded-2xl bg-neutral-50 border border-neutral-200 hover:border-black text-left transition-all group"
+              >
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-neutral-500 mb-1 group-hover:text-black">
+                  <Building2 className="w-3.5 h-3.5 text-black" /> Buyer Account
+                </div>
+                <div className="font-extrabold text-xs text-black">Godavari Fresh</div>
+                <div className="text-[10px] text-neutral-400">2,000 kg demand</div>
+              </button>
+            </div>
+
+            <div className="relative flex items-center justify-center mb-6">
+              <div className="border-t border-neutral-200 w-full"></div>
+              <span className="bg-white px-3 text-[10px] uppercase font-bold text-neutral-400 tracking-wider absolute">
+                or sign in with credentials
+              </span>
             </div>
 
             {errorMsg && (

@@ -29,8 +29,8 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto text-center space-y-8">
             {/* Tag badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-agri-orange-50 border border-agri-orange-200 text-agri-orange-600 text-xs font-semibold uppercase tracking-wider">
-              <span className="w-2 h-2 rounded-full bg-agri-orange-500 animate-pulse"></span>
-              24-Hour Hackathon Agritech Platform
+              <span className="w-2 h-2 rounded-full bg-agri-orange-500"></span>
+              Enterprise B2B Agricultural Infrastructure
             </div>
 
             {/* Main Headline */}
@@ -66,7 +66,7 @@ export default function LandingPage() {
             <div className="pt-12 grid grid-cols-2 md:grid-cols-4 gap-6 border-t border-neutral-200 mt-12 text-left">
               <div>
                 <div className="text-2xl sm:text-3xl font-black text-black">2,000 kg</div>
-                <div className="text-xs text-neutral-500 font-medium">Bulk Aggregation Demo</div>
+                <div className="text-xs text-neutral-500 font-medium">Bulk Yield Aggregation</div>
               </div>
               <div>
                 <div className="text-2xl sm:text-3xl font-black text-agri-orange-500">6-Factor</div>
@@ -292,7 +292,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between pb-4 border-b border-neutral-800 mb-6">
                 <div>
                   <span className="text-[11px] font-bold text-agri-orange-400 uppercase tracking-wide">
-                    Live Demo Scenario: Vijayawada Hub
+                    Live Procurement Opportunity: Vijayawada Hub
                   </span>
                   <h4 className="text-lg font-bold text-white">
                     Buyer Request: 2,000 kg Grade-A Tomato @ ₹28/kg
@@ -410,7 +410,7 @@ export default function LandingPage() {
             Ready to Experience B2B Agricultural Procurement?
           </h2>
           <p className="text-neutral-600 text-base max-w-xl mx-auto">
-            Try the live interactive hackathon demo with seeded Farmer A, Suresh Rao, Kalyan Chakravarthy, and full multi-party aggregation.
+            Join the decentralized agricultural network. Source certified high-grade crops with multi-farmer volume aggregation and real-time shipment traceability.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <Link

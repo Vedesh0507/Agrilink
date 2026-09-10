@@ -344,7 +344,7 @@ export default function FarmerDashboard() {
             <div className="p-5 rounded-2xl bg-black text-white border border-neutral-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-neutral-900 px-2.5 py-1 rounded-full">
-                  Primary Hackathon Workflow Demo
+                  Consolidated Procurement Pool
                 </span>
                 <h3 className="text-base font-bold text-white mt-2">
                   Farmer A: 500 kg Grade-A Tomato Lot Committed to Aggregated Pool

@@ -338,7 +338,7 @@ export default function BuyerDashboard() {
             <div className="p-6 rounded-3xl bg-neutral-900 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="space-y-2 max-w-2xl">
                 <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-agri-orange-400 bg-black px-3 py-1 rounded-full border border-neutral-800">
-                  <Sparkles className="w-3 h-3 text-agri-orange-500" /> Hackathon Core Demonstration
+                  <Sparkles className="w-3 h-3 text-agri-orange-500" /> Enterprise Multi-Supplier Sourcing
                 </div>
                 <h3 className="text-xl font-black text-white">
                   Aggregated Procurement Opportunity: 2,000 kg Grade-A Tomatoes
