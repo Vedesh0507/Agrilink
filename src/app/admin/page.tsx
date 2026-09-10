@@ -48,8 +48,6 @@ import { formatCurrency, formatQuantity } from '@/lib/utils';
 // Operational Pillars & Module IDs
 type AdminModuleId =
   | 'overview'
-  | 'system_health'
-  | 'integrations'
   | 'users'
   | 'kyc'
   | 'fraud_risk'
@@ -599,12 +597,10 @@ export default function AdminPortalPage() {
   // Nav categories structure
   const navSections: NavSection[] = [
     {
-      title: 'Ops & Observability',
+      title: 'Command Center',
       icon: Activity,
       items: [
-        { id: 'overview', label: 'Command Center' },
-        { id: 'system_health', label: 'System Health & Uptime' },
-        { id: 'integrations', label: 'Integrations Console' },
+        { id: 'overview', label: 'Operations Command Center' },
       ],
     },
     {
@@ -1084,31 +1080,29 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  {/* System Health Quick Card */}
+                  {/* Commercial Dispute Resolution Quick Card */}
                   <div className="bg-white p-5 rounded-3xl border border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-black text-agri-orange-500 flex items-center justify-center shrink-0">
-                        <Activity className="w-6 h-6" />
+                        <ShieldAlert className="w-6 h-6" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-extrabold text-sm text-black">Cluster Health & Latency</h3>
-                          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-bold">
-                            HEALTHY
+                          <h3 className="font-extrabold text-sm text-black">Commercial Dispute Resolution Center</h3>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                            {metrics.counts.totalDisputes} ACTIVE
                           </span>
                         </div>
                         <p className="text-xs text-neutral-500 mt-0.5">
-                          MongoDB ping: {metrics.systemHealth?.databaseLatencyMs || 24}ms • Memory:{' '}
-                          {metrics.systemHealth?.memoryHeapUsedMB || 128}MB • Node Uptime:{' '}
-                          {Math.round((metrics.systemHealth?.nodeUptimeSeconds || 3600) / 60)} mins
+                          Arbitrate produce weight variances, transit spoilage claims, and release escrow adjustments safely.
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => setActiveModule('system_health')}
-                      className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      onClick={() => setActiveModule('disputes')}
+                      className="px-4 py-2 bg-neutral-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                     >
-                      <Server className="w-3.5 h-3.5" /> Full Observability
+                      <ShieldAlert className="w-3.5 h-3.5" /> Open Dispute Hub
                     </button>
                   </div>
 
@@ -1173,146 +1167,7 @@ export default function AdminPortalPage() {
                 </div>
               )}
 
-              {/* MODULE 2: SYSTEM HEALTH & UPTIME */}
-              {activeModule === 'system_health' && metrics && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-black text-black">System Observability & Runtime Health</h2>
-                    <p className="text-xs text-neutral-500">
-                      Live cluster metrics, database read/write latency, and memory consumption
-                    </p>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-5 rounded-3xl bg-white border border-neutral-200">
-                      <div className="flex items-center justify-between text-neutral-500 mb-2">
-                        <span className="text-xs font-bold uppercase">MongoDB Atlas Ping</span>
-                        <Database className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div className="text-3xl font-black text-neutral-900">
-                        {metrics.systemHealth?.databaseLatencyMs || 18} ms
-                      </div>
-                      <p className="text-xs text-green-700 font-semibold mt-1">
-                        High Availability Replica Set • Connected
-                      </p>
-                    </div>
-
-                    <div className="p-5 rounded-3xl bg-white border border-neutral-200">
-                      <div className="flex items-center justify-between text-neutral-500 mb-2">
-                        <span className="text-xs font-bold uppercase">V8 Heap Memory</span>
-                        <Cpu className="w-4 h-4 text-agri-orange-500" />
-                      </div>
-                      <div className="text-3xl font-black text-neutral-900">
-                        {metrics.systemHealth?.memoryHeapUsedMB || 112} MB
-                      </div>
-                      <p className="text-xs text-neutral-500 mt-1">Within optimal container quota (512 MB)</p>
-                    </div>
-
-                    <div className="p-5 rounded-3xl bg-white border border-neutral-200">
-                      <div className="flex items-center justify-between text-neutral-500 mb-2">
-                        <span className="text-xs font-bold uppercase">Process Uptime</span>
-                        <Clock className="w-4 h-4 text-neutral-700" />
-                      </div>
-                      <div className="text-3xl font-black text-neutral-900">
-                        {Math.floor((metrics.systemHealth?.nodeUptimeSeconds || 7200) / 3600)}h{' '}
-                        {Math.floor(((metrics.systemHealth?.nodeUptimeSeconds || 7200) % 3600) / 60)}m
-                      </div>
-                      <p className="text-xs text-neutral-500 mt-1">Zero unhandled process crashes</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-6 rounded-3xl border border-neutral-200 space-y-3">
-                    <h3 className="font-extrabold text-sm text-black">Telemetry Checkpoints</h3>
-                    <div className="space-y-2 text-xs">
-                      {[
-                        { name: 'Core API Gateway', status: '200 OK', latency: `${metrics?.systemHealth?.executionTimeMs || 12}ms`, state: 'ONLINE' },
-                        { name: 'MongoDB Atlas Ping', status: '200 OK', latency: `${metrics?.systemHealth?.databaseLatencyMs || 18}ms`, state: 'CONNECTED' },
-                        { name: 'Node.js V8 Engine Heap', status: 'HEALTHY', latency: `${metrics?.systemHealth?.memoryHeapUsedMB || 112}MB`, state: 'OPTIMAL' },
-                        { name: 'Cluster Process Uptime', status: 'RUNNING', latency: `${Math.round((metrics?.systemHealth?.nodeUptimeSeconds || 3600) / 60)} mins`, state: 'ACTIVE' },
-                      ].map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-between"
-                        >
-                          <div className="font-bold text-neutral-800">{item.name}</div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-neutral-500">{item.latency}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-bold">
-                              {item.state}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* MODULE 3: INTEGRATIONS CONSOLE */}
-              {activeModule === 'integrations' && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-black text-black">Third-Party & Auxiliary Integrations</h2>
-                    <p className="text-xs text-neutral-500">
-                      External services connectivity status without exposing sensitive credentials or private tokens
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    {[
-                      {
-                        name: 'MongoDB Atlas',
-                        purpose: 'Primary multi-tenant ACID document store',
-                        status: 'CONNECTED',
-                        endpoint: 'agrilink.1ftppaj.mongodb.net',
-                        authMode: 'SCRAM-SHA-256 TLS 1.3',
-                      },
-                      {
-                        name: 'Firebase & NextAuth Gateway',
-                        purpose: 'Authentication identity provider & phone OTP verification',
-                        status: 'OPERATIONAL',
-                        endpoint: 'agrilink-scet.firebaseapp.com',
-                        authMode: 'OAuth2 / RS256 Bearer Tokens',
-                      },
-                      {
-                        name: 'WhatsApp Business API Webhooks',
-                        purpose: 'Farmer regional language dispatch and counter-offer SMS/WhatsApp alerts',
-                        status: 'READY (LOCAL SIMULATOR)',
-                        endpoint: 'api.whatsapp.com/v16.0',
-                        authMode: 'HMAC-SHA256 Webhook Signature',
-                      },
-                      {
-                        name: 'Cloudinary / S3 Image Storage',
-                        purpose: 'High-resolution harvest photo uploads & quality inspection logs',
-                        status: 'CONFIGURED',
-                        endpoint: 'res.cloudinary.com/agrilink',
-                        authMode: 'API Signature v2',
-                      },
-                      {
-                        name: 'Payment Settlement Ledger',
-                        purpose: 'B2B bank account settlement & escrow clearing records',
-                        status: 'INTERNAL LEDGER',
-                        endpoint: 'clearing.agrilink.internal',
-                        authMode: 'Immutable Audit Trail',
-                      },
-                    ].map((integ, idx) => (
-                      <div key={idx} className="p-5 rounded-3xl bg-white border border-neutral-200 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="font-extrabold text-sm text-black">{integ.name}</div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800">
-                            {integ.status}
-                          </span>
-                        </div>
-                        <p className="text-neutral-500 text-xs">{integ.purpose}</p>
-                        <div className="pt-2 border-t border-neutral-100 flex flex-col gap-1 font-mono text-[11px] text-neutral-400">
-                          <div>Host: {integ.endpoint}</div>
-                          <div>Auth: {integ.authMode}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* MODULE 4: UNIFIED USER DIRECTORY */}
               {activeModule === 'users' && (
