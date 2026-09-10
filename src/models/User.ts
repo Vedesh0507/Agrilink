@@ -10,6 +10,11 @@ export interface IUserDocument extends Document {
   alternatePhone?: string;
   bio?: string;
   role: UserRole;
+  adminSubRole?: 'SUPER_ADMIN' | 'OPS_ADMIN' | 'FINANCE_ADMIN' | 'SUPPORT_ADMIN' | 'VERIFICATION_ADMIN' | 'ANALYTICS_ADMIN';
+  accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'UNDER_REVIEW' | 'BANNED';
+  reliabilityScore?: number;
+  cancellationCount?: number;
+  disputeCount?: number;
   organizationId?: mongoose.Types.ObjectId;
   location: string;
   kycStatus?: 'VERIFIED' | 'PENDING' | 'SUBMITTED';
@@ -66,6 +71,28 @@ const UserSchema = new Schema<IUserDocument>(
       enum: ['FARMER', 'BUYER', 'ADMIN'],
       required: true,
       index: true,
+    },
+    adminSubRole: {
+      type: String,
+      enum: ['SUPER_ADMIN', 'OPS_ADMIN', 'FINANCE_ADMIN', 'SUPPORT_ADMIN', 'VERIFICATION_ADMIN', 'ANALYTICS_ADMIN'],
+    },
+    accountStatus: {
+      type: String,
+      enum: ['ACTIVE', 'SUSPENDED', 'UNDER_REVIEW', 'BANNED'],
+      default: 'ACTIVE',
+      index: true,
+    },
+    reliabilityScore: {
+      type: Number,
+      default: 95,
+    },
+    cancellationCount: {
+      type: Number,
+      default: 0,
+    },
+    disputeCount: {
+      type: Number,
+      default: 0,
     },
     organizationId: {
       type: Schema.Types.ObjectId,

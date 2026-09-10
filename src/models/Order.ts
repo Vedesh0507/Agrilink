@@ -14,6 +14,8 @@ export interface IOrderDocument extends Document {
   deliveryDate: Date;
   orderStatus: OrderStatus;
   currentFulfillmentStage: FulfillmentStage;
+  paymentStatus?: string;
+  disputeId?: mongoose.Types.ObjectId;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -48,7 +50,7 @@ const OrderSchema = new Schema<IOrderDocument>(
     deliveryDate: { type: Date, required: true },
     orderStatus: {
       type: String,
-      enum: ['CONFIRMED', 'PROCESSING', 'READY_FOR_DISPATCH', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED'],
+      enum: ['CONFIRMED', 'PROCESSING', 'READY_FOR_DISPATCH', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'DISPUTED'],
       default: 'CONFIRMED',
       index: true,
     },
@@ -58,6 +60,13 @@ const OrderSchema = new Schema<IOrderDocument>(
       default: 'ORDER_CONFIRMED',
       index: true,
     },
+    paymentStatus: {
+      type: String,
+      enum: ['PENDING', 'RECORDED_IN_ESCROW', 'SETTLED', 'REFUNDED', 'DISPUTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    disputeId: { type: Schema.Types.ObjectId, ref: 'Dispute' },
     notes: { type: String },
   },
   {

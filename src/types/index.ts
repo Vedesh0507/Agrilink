@@ -1,5 +1,15 @@
 export type UserRole = 'FARMER' | 'BUYER' | 'ADMIN';
 
+export type AdminSubRole = 
+  | 'SUPER_ADMIN' 
+  | 'OPS_ADMIN' 
+  | 'FINANCE_ADMIN' 
+  | 'SUPPORT_ADMIN' 
+  | 'VERIFICATION_ADMIN' 
+  | 'ANALYTICS_ADMIN';
+
+export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'UNDER_REVIEW' | 'BANNED';
+
 export type QualityGrade = 'Grade A' | 'Grade B' | 'Grade C';
 
 export type ProduceStatus = 'AVAILABLE' | 'COMMITTED' | 'DEPLETED' | 'INACTIVE';
@@ -21,7 +31,8 @@ export type OrderStatus =
   | 'IN_TRANSIT' 
   | 'DELIVERED' 
   | 'COMPLETED' 
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'DISPUTED';
 
 export type FulfillmentStage = 
   | 'ORDER_CONFIRMED'
@@ -40,6 +51,11 @@ export interface IUser {
   alternatePhone?: string;
   bio?: string;
   role: UserRole;
+  adminSubRole?: AdminSubRole;
+  accountStatus?: AccountStatus;
+  reliabilityScore?: number;
+  cancellationCount?: number;
+  disputeCount?: number;
   organizationId?: string | IOrganization;
   organizationName?: string;
   location: string;
@@ -266,11 +282,105 @@ export interface INotification {
 export interface IAuditLog {
   _id?: string;
   actorId: string;
-  actorRole: UserRole;
+  actorEmail?: string;
+  actorRole: UserRole | AdminSubRole;
   action: string;
   resource: string;
   resourceId?: string;
   details?: any;
+  beforeState?: any;
+  afterState?: any;
+  reason?: string;
+  requestId?: string;
+  status?: 'SUCCESS' | 'FAILURE';
   ipAddress?: string;
   timestamp: string | Date;
 }
+
+export interface IDispute {
+  _id?: string;
+  disputeNumber: string;
+  orderId: string;
+  orderNumber?: string;
+  raisedById: string;
+  raisedByName: string;
+  raisedByRole: UserRole;
+  counterPartyId: string;
+  counterPartyName: string;
+  reason: 'QUALITY_MISMATCH' | 'QUANTITY_SHORTFALL' | 'TRANSIT_DAMAGE' | 'PAYMENT_ISSUE' | 'OTHER';
+  claimedAmount: number;
+  evidencePhotos?: string[];
+  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'REJECTED';
+  resolutionNotes?: string;
+  settlementAmount?: number;
+  resolvedById?: string;
+  resolvedByName?: string;
+  resolvedAt?: string | Date;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface ILedgerEntry {
+  _id?: string;
+  entryNumber: string;
+  orderId?: string;
+  orderNumber?: string;
+  type: 'PAYMENT_RECORDED' | 'SUPPLIER_PAYOUT' | 'PLATFORM_COMMISSION' | 'TAX_GST' | 'REFUND';
+  amount: number;
+  currency: string;
+  status: 'RECORDED' | 'SETTLED' | 'PENDING' | 'RECONCILED';
+  payerId?: string;
+  payerName?: string;
+  payeeId?: string;
+  payeeName?: string;
+  paymentMethod?: string;
+  providerReference?: string;
+  notes?: string;
+  createdAt: string | Date;
+}
+
+export interface ISupportTicket {
+  _id?: string;
+  ticketNumber: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  orderId?: string;
+  category: 'PAYMENT' | 'ORDER' | 'QUALITY' | 'DELIVERY' | 'ACCOUNT' | 'KYC' | 'TECHNICAL';
+  subject: string;
+  description: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  assignedTo?: string;
+  resolutionNotes?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface IPlatformConfig {
+  _id?: string;
+  platformCommissionPercent: number;
+  minOrderValue: number;
+  disputeWindowHours: number;
+  featureFlags: {
+    multiSupplierMatching: boolean;
+    whatsAppAlerts: boolean;
+    onlineEscrow: boolean;
+    autoKycApproval: boolean;
+    logisticsTracking: boolean;
+  };
+  supportedCommodities: string[];
+  updatedAt: string | Date;
+}
+
+export interface IMarketplaceAnnouncement {
+  _id?: string;
+  title: string;
+  message: string;
+  targetAudience: 'ALL' | 'FARMER' | 'BUYER';
+  targetDistrict?: string;
+  targetCommodity?: string;
+  sentBy: string;
+  sentAt: string | Date;
+}
+

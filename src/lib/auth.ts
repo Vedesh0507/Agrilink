@@ -179,3 +179,55 @@ export function verifyAdminAccess(req: NextRequest, user?: IUserDocument): boole
 
   return false;
 }
+
+export type AdminPermission =
+  | 'METRICS_VIEW'
+  | 'USERS_MANAGE'
+  | 'KYC_VERIFY'
+  | 'SUPPLY_MANAGE'
+  | 'DEMAND_MANAGE'
+  | 'ORDERS_MANAGE'
+  | 'FINANCE_MANAGE'
+  | 'DISPUTES_RESOLVE'
+  | 'BROADCAST_SEND'
+  | 'CONFIG_MANAGE'
+  | 'SYSTEM_HEALTH';
+
+/**
+ * Validates granular administrative permissions based on adminSubRole.
+ */
+export function verifyAdminPermission(
+  req: NextRequest,
+  user?: IUserDocument,
+  permission?: AdminPermission
+): boolean {
+  if (!verifyAdminAccess(req, user)) {
+    return false;
+  }
+
+  // Master key or admin session token has full access
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+  if (authHeader && authHeader.includes('admin_session_')) return true;
+  const adminSecret = req.headers.get('x-admin-secret-key');
+  if (adminSecret && adminSecret === process.env.ADMIN_SECRET_KEY) return true;
+
+  if (!user || user.role !== 'ADMIN') return false;
+
+  // Super admin has all permissions
+  const subRole = user.adminSubRole;
+  if (!subRole || subRole === 'SUPER_ADMIN') return true;
+
+  if (!permission) return true;
+
+  const rolePermissions: Record<string, AdminPermission[]> = {
+    OPS_ADMIN: ['METRICS_VIEW', 'SUPPLY_MANAGE', 'DEMAND_MANAGE', 'ORDERS_MANAGE', 'BROADCAST_SEND'],
+    FINANCE_ADMIN: ['METRICS_VIEW', 'FINANCE_MANAGE', 'ORDERS_MANAGE'],
+    VERIFICATION_ADMIN: ['METRICS_VIEW', 'KYC_VERIFY', 'USERS_MANAGE'],
+    SUPPORT_ADMIN: ['METRICS_VIEW', 'DISPUTES_RESOLVE', 'USERS_MANAGE', 'ORDERS_MANAGE'],
+    ANALYTICS_ADMIN: ['METRICS_VIEW', 'SYSTEM_HEALTH'],
+  };
+
+  const allowed = rolePermissions[subRole] || [];
+  return allowed.includes(permission);
+}
+

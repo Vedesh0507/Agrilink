@@ -8,3 +8,8 @@ export * from './Order';
 export * from './FulfillmentEvent';
 export * from './Notification';
 export * from './AuditLog';
+export * from './Dispute';
+export * from './LedgerEntry';
+export * from './PlatformConfig';
+export * from './MarketplaceAnnouncement';
+export * from './SupportTicket';
