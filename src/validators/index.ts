@@ -45,6 +45,36 @@ export const UpdateProfileSchema = z.object({
   }).optional(),
 });
 
+export const AIAssessmentSchema = z.object({
+  detectedProduce: z.string().optional(),
+  possibleVariety: z.string().nullable().optional(),
+  recommendedQuality: z.enum(['Grade A', 'Grade B', 'Grade C']).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  confidenceLevel: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
+  imageQuality: z.enum(['GOOD', 'ACCEPTABLE', 'POOR', 'BLURRY', 'DARK', 'INSUFFICIENT']).optional(),
+  visibleIndicators: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional(),
+  needsHumanReview: z.boolean().optional(),
+  analyzedAt: z.string().or(z.date()).optional(),
+  modelVersion: z.string().optional(),
+  provider: z.string().optional(),
+  farmerAccepted: z.boolean().optional(),
+});
+
+export const ProduceAnalysisRequestSchema = z.object({
+  images: z
+    .array(
+      z.object({
+        mimeType: z.string().regex(/^image\/(jpeg|jpg|png|webp)$/i, 'Only JPEG, PNG, and WebP images are supported'),
+        base64Data: z.string().min(50, 'Image data is too small or invalid'),
+        viewType: z.enum(['FRONT', 'SIDE', 'CLOSEUP', 'ADDITIONAL', 'OTHER']).optional(),
+      })
+    )
+    .min(1, 'At least 1 produce image is required for visual assessment')
+    .max(4, 'A maximum of 4 images can be evaluated per lot'),
+  farmerCropName: z.string().max(100).optional(),
+});
+
 export const ProduceListingSchema = z.object({
   product: z.string().min(2, 'Product name is required'),
   variety: z.string().optional(),
@@ -56,6 +86,10 @@ export const ProduceListingSchema = z.object({
   availableFromDate: z.string().or(z.date()),
   expiryDate: z.string().or(z.date()).optional(),
   description: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
+  aiAssessment: AIAssessmentSchema.optional(),
+  farmerConfirmedQuality: z.enum(['Grade A', 'Grade B', 'Grade C']).optional(),
+  farmerConfirmedProduce: z.string().optional(),
 });
 
 export const BuyerRequirementSchema = z.object({

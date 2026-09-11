@@ -26,9 +26,18 @@ import {
   Phone,
   MessageCircle,
   Mail,
+  Camera,
+  Sparkles,
+  UploadCloud,
+  X,
+  ShieldCheck,
+  Eye,
+  HelpCircle,
+  Info,
+  ChevronRight,
 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
-import { IProduceListing, IQuotation, IOrder, IBuyerRequirement, IMatch } from '@/types';
+import { IProduceListing, IQuotation, IOrder, IBuyerRequirement, IMatch, IAIAssessment } from '@/types';
 import UserProfileManager from '@/components/UserProfileManager';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -113,7 +122,22 @@ export default function FarmerDashboard() {
     }
   };
 
-  // Add produce form state
+  // Add produce form & AI analysis state
+  interface UploadedProduceImage {
+    mimeType: string;
+    base64Data: string;
+    viewType: 'FRONT' | 'SIDE' | 'CLOSEUP' | 'ADDITIONAL';
+    previewUrl: string;
+  }
+  const [uploadedImages, setUploadedImages] = useState<UploadedProduceImage[]>([]);
+  const [isAnalyzingProduce, setIsAnalyzingProduce] = useState(false);
+  const [aiAssessmentResult, setAiAssessmentResult] = useState<IAIAssessment | null>(null);
+  const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
+  const [aiDisclaimer, setAiDisclaimer] = useState<string | null>(null);
+  const [farmerAcceptedAi, setFarmerAcceptedAi] = useState(false);
+  const [selectedImageForPreview, setSelectedImageForPreview] = useState<string | null>(null);
+  const [selectedAiReportListing, setSelectedAiReportListing] = useState<IProduceListing | null>(null);
+
   const [newProduce, setNewProduce] = useState({
     product: 'Tomato',
     variety: 'Vaishnavi Hybrid',
@@ -161,7 +185,10 @@ export default function FarmerDashboard() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['overview', 'produce', 'requirements', 'matches', 'quotations', 'orders', 'profile'].includes(tabParam)) {
+      if (
+        tabParam &&
+        ['overview', 'produce', 'requirements', 'matches', 'quotations', 'orders', 'profile'].includes(tabParam)
+      ) {
         setActiveTab(tabParam as TabType);
       }
     }
@@ -174,25 +201,157 @@ export default function FarmerDashboard() {
     }
   }, [user, token]);
 
+  const handleOpenAddProduceModal = () => {
+    setUploadedImages([]);
+    setAiAssessmentResult(null);
+    setAiAnalysisError(null);
+    setAiDisclaimer(null);
+    setFarmerAcceptedAi(false);
+    setNewProduce({
+      product: 'Tomato',
+      variety: 'Vaishnavi Hybrid',
+      quantity: 500,
+      unit: 'kg',
+      qualityGrade: 'Grade A',
+      expectedPricePerUnit: 28,
+      location: user?.location || 'Vijayawada, AP',
+      availableFromDate: new Date().toISOString().split('T')[0],
+      description: '',
+    });
+    setShowAddProduceModal(true);
+  };
+
+  const handleImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    viewType: 'FRONT' | 'SIDE' | 'CLOSEUP' | 'ADDITIONAL'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/i)) {
+      alert('Please upload a valid JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size exceeds 5MB. Please choose a smaller photo.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      setUploadedImages((prev) => {
+        const filtered = prev.filter((img) => img.viewType !== viewType);
+        return [
+          ...filtered,
+          {
+            mimeType: file.type,
+            base64Data,
+            viewType,
+            previewUrl: base64Data,
+          },
+        ];
+      });
+      // Invalidate existing AI assessment if images are changed
+      setAiAssessmentResult(null);
+      setAiAnalysisError(null);
+      setFarmerAcceptedAi(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (viewType: string) => {
+    setUploadedImages((prev) => prev.filter((img) => img.viewType !== viewType));
+    setAiAssessmentResult(null);
+    setFarmerAcceptedAi(false);
+  };
+
+  const handleRunAiAnalysis = async () => {
+    if (uploadedImages.length === 0) {
+      alert('Please upload at least 1 produce image (Front View) to run AI analysis.');
+      return;
+    }
+
+    setIsAnalyzingProduce(true);
+    setAiAnalysisError(null);
+
+    try {
+      const res = await fetch('/api/produce/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          images: uploadedImages.map((img) => ({
+            mimeType: img.mimeType,
+            base64Data: img.base64Data,
+            viewType: img.viewType,
+          })),
+          farmerCropName: newProduce.product,
+          additionalNotes: newProduce.description,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.data?.assessment) {
+        setAiAssessmentResult(data.data.assessment);
+        setAiDisclaimer(data.data.disclaimer);
+      } else {
+        setAiAnalysisError(data.error || 'AI visual assessment could not be completed.');
+      }
+    } catch (err: any) {
+      setAiAnalysisError(err.message || 'Network error while contacting AI vision service.');
+    } finally {
+      setIsAnalyzingProduce(false);
+    }
+  };
+
+  const handleAcceptAiRecommendation = () => {
+    if (!aiAssessmentResult) return;
+    setNewProduce((prev) => ({
+      ...prev,
+      product: aiAssessmentResult.detectedProduce || prev.product,
+      variety: aiAssessmentResult.possibleVariety || prev.variety,
+      qualityGrade: aiAssessmentResult.recommendedQuality || prev.qualityGrade,
+    }));
+    setFarmerAcceptedAi(true);
+  };
+
   const handleAddProduce = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
 
     try {
+      const payload = {
+        ...newProduce,
+        imageUrls: uploadedImages.map((img) => img.base64Data),
+        aiAssessment: aiAssessmentResult
+          ? {
+              ...aiAssessmentResult,
+              farmerAccepted: farmerAcceptedAi,
+            }
+          : undefined,
+        farmerConfirmedQuality: newProduce.qualityGrade,
+        farmerConfirmedProduce: newProduce.product,
+      };
+
       const res = await fetch('/api/produce', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newProduce),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
         setShowAddProduceModal(false);
+        setUploadedImages([]);
+        setAiAssessmentResult(null);
         fetchData();
       } else {
-        alert('Failed to add produce: ' + data.error);
+        alert('Failed to add produce: ' + (data.error || JSON.stringify(data.details)));
       }
     } catch (err: any) {
       alert('Error adding produce: ' + err.message);
@@ -483,7 +642,7 @@ export default function FarmerDashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowAddProduceModal(true)}
+                  onClick={handleOpenAddProduceModal}
                   className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs transition-colors shrink-0"
                 >
                   + Add First Produce Lot
@@ -588,7 +747,7 @@ export default function FarmerDashboard() {
                 </p>
               </div>
               <button
-                onClick={() => setShowAddProduceModal(true)}
+                onClick={handleOpenAddProduceModal}
                 className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" /> Add Produce Lot
@@ -599,9 +758,27 @@ export default function FarmerDashboard() {
               {listings.map((l) => (
                 <div
                   key={l._id}
-                  className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm flex flex-col justify-between"
+                  className="rounded-2xl bg-white border border-neutral-200 shadow-sm overflow-hidden flex flex-col justify-between hover:border-neutral-300 transition-all"
                 >
-                  <div>
+                  {/* Image Header Preview if photos uploaded */}
+                  {l.imageUrls && l.imageUrls.length > 0 && (
+                    <div className="relative h-44 bg-neutral-100 overflow-hidden group cursor-pointer" onClick={() => setSelectedImageForPreview(l.imageUrls![0])}>
+                      <img
+                        src={l.imageUrls[0]}
+                        alt={l.product}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-xs text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                        <Camera className="w-3 h-3 text-agri-orange-400" />
+                        <span>{l.imageUrls.length} Photo{l.imageUrls.length > 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                        <Eye className="w-4 h-4" /> Click to Inspect
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-5">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
@@ -610,10 +787,49 @@ export default function FarmerDashboard() {
                         <h3 className="font-extrabold text-base text-black">{l.product}</h3>
                         {l.variety && <div className="text-xs text-neutral-500">{l.variety}</div>}
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-neutral-100 text-black border border-neutral-300">
-                        {l.qualityGrade}
-                      </span>
+                      <div className="text-right flex flex-col items-end gap-1">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-neutral-100 text-black border border-neutral-300">
+                          {l.qualityGrade}
+                        </span>
+                        {l.aiAssessment && (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold flex items-center gap-1 ${
+                              l.aiAssessment.confidenceLevel === 'HIGH'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : l.aiAssessment.confidenceLevel === 'MEDIUM'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
+                          >
+                            <Sparkles className="w-2.5 h-2.5" />
+                            AI {l.aiAssessment.recommendedQuality} ({Math.round((l.aiAssessment.confidence || 0) * 100)}%)
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* AI Assessment Snapshot Banner */}
+                    {l.aiAssessment && (
+                      <div className="mb-3 p-2.5 rounded-xl bg-neutral-50 border border-neutral-100 text-[11px] space-y-1.5">
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="text-neutral-500">AI Visual Grade:</span>
+                          <span className="font-bold text-black">{l.aiAssessment.recommendedQuality}</span>
+                        </div>
+                        {l.farmerConfirmedQuality && l.farmerConfirmedQuality !== l.aiAssessment.recommendedQuality && (
+                          <div className="flex items-center justify-between text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                            <span>Farmer Selection:</span>
+                            <span className="font-bold">{l.farmerConfirmedQuality} (Override)</span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAiReportListing(l)}
+                          className="w-full text-center text-agri-orange-600 hover:text-agri-orange-700 font-bold text-[10px] pt-1 border-t border-neutral-200/50 flex items-center justify-center gap-1"
+                        >
+                          <Info className="w-3 h-3" /> View Visual Quality Report
+                        </button>
+                      </div>
+                    )}
 
                     <div className="space-y-2 py-3 border-t border-b border-neutral-100 text-xs">
                       <div className="flex justify-between">
@@ -641,7 +857,7 @@ export default function FarmerDashboard() {
                     )}
                   </div>
 
-                  <div className="pt-4 mt-4 border-t border-neutral-100 flex items-center justify-between">
+                  <div className="p-5 pt-0 mt-auto flex items-center justify-between">
                     <button
                       onClick={() => handleToggleStatus(l._id!, l.status)}
                       className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
@@ -1029,74 +1245,393 @@ export default function FarmerDashboard() {
       </div>
     )}
 
-      {/* ADD PRODUCE MODAL */}
+      {/* ADD PRODUCE MODAL WITH AI VISUAL ASSESSMENT */}
       {showAddProduceModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-neutral-200 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-              <h3 className="font-extrabold text-base text-black">List New Agricultural Lot</h3>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 border border-neutral-200 shadow-2xl space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold text-white bg-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    Harvest Cataloging
+                  </span>
+                  <span className="text-[10px] font-extrabold text-agri-orange-600 bg-agri-orange-50 px-2.5 py-0.5 rounded-full border border-agri-orange-200 flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" /> AI Vision Assisted
+                  </span>
+                </div>
+                <h3 className="font-black text-lg text-black mt-1">
+                  List New Agricultural Lot
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  Upload lot photographs for instant visual quality grading by AgriLink AI, or enter parameters manually.
+                </p>
+              </div>
               <button
-                onClick={() => setShowAddProduceModal(false)}
-                className="text-neutral-400 hover:text-black text-sm font-bold"
+                onClick={() => {
+                  setShowAddProduceModal(false);
+                  setUploadedImages([]);
+                  setAiAssessmentResult(null);
+                }}
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-500 hover:text-black text-sm font-bold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddProduce} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-neutral-700 mb-1">Crop / Produce</label>
-                <input
-                  type="text"
-                  required
-                  value={newProduce.product}
-                  onChange={(e) => setNewProduce({ ...newProduce, product: e.target.value })}
-                  placeholder="e.g. Tomato"
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
-                />
+            {/* SECTION 1: 4-SLOT IMAGE UPLOAD GRID */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-agri-orange-500" />
+                    Representative Lot Photographs (1 – 4 Images)
+                  </h4>
+                  <p className="text-[11px] text-neutral-500">
+                    High-resolution photos enable precise AI classification of color uniformity, sizing, and cosmetic blemish ratio.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-neutral-400">
+                  {uploadedImages.length}/4 Uploaded
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { view: 'FRONT', label: 'Front View', sub: 'Primary face', required: true },
+                  { view: 'SIDE', label: 'Side View', sub: 'Lateral angle', required: false },
+                  { view: 'CLOSEUP', label: 'Close-up View', sub: 'Skin/surface detail', required: false },
+                  { view: 'ADDITIONAL', label: 'Additional View', sub: 'Crate or pile', required: false },
+                ].map((slot) => {
+                  const uploaded = uploadedImages.find((img) => img.viewType === slot.view);
+                  return (
+                    <div
+                      key={slot.view}
+                      className={`relative rounded-2xl border-2 transition-all p-2.5 flex flex-col items-center justify-center text-center min-h-[140px] ${
+                        uploaded
+                          ? 'border-agri-orange-500 bg-orange-50/20'
+                          : 'border-dashed border-neutral-200 hover:border-neutral-400 bg-neutral-50/50'
+                      }`}
+                    >
+                      {uploaded ? (
+                        <div className="w-full h-full flex flex-col items-center justify-between relative group">
+                          <img
+                            src={uploaded.previewUrl}
+                            alt={slot.label}
+                            className="w-full h-20 object-cover rounded-xl border border-neutral-200"
+                          />
+                          <div className="mt-1.5 w-full flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold text-black truncate">
+                              {slot.label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(slot.view)}
+                              className="text-rose-500 hover:text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100"
+                              title="Remove photo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-1">
+                          <UploadCloud className="w-5 h-5 text-neutral-400 mb-1" />
+                          <span className="text-[11px] font-bold text-black">{slot.label}</span>
+                          <span className="text-[9px] text-neutral-400">{slot.sub}</span>
+                          {slot.required && (
+                            <span className="text-[8px] font-extrabold text-agri-orange-600 uppercase mt-0.5">
+                              Recommended
+                            </span>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload(e, slot.view as any)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* AI Trigger Action Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <div className="text-[11px] text-neutral-500">
+                  {uploadedImages.length === 0 ? (
+                    <span className="italic text-neutral-400">
+                      Upload at least 1 photo above to enable automated AI quality grading.
+                    </span>
+                  ) : (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      {uploadedImages.length} image(s) prepared for visual analysis.
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRunAiAnalysis}
+                  disabled={uploadedImages.length === 0 || isAnalyzingProduce}
+                  className="w-full sm:w-auto px-5 py-2 bg-gradient-to-r from-agri-orange-500 to-agri-orange-600 hover:from-agri-orange-600 hover:to-agri-orange-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isAnalyzingProduce ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>AgriLink AI is Analyzing Lot...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{aiAssessmentResult ? 'Re-Analyze with AgriLink AI' : 'Analyze with AgriLink AI'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION 2: AI ASSESSMENT RESULT CARD */}
+            {aiAnalysisError && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-bold">AI Visual Assessment Notice</div>
+                  <div className="text-[11px] text-rose-700">{aiAnalysisError}</div>
+                  <div className="text-[10px] text-rose-500 mt-1">
+                    You may proceed with manual listing by filling the commercial parameters below.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {aiAssessmentResult && (
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-900 to-black text-white border border-neutral-800 space-y-4 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                      AgriLink AI Visual Quality Assessment
+                    </h4>
+                  </div>
+                  {/* Confidence Badge */}
+                  <div
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 self-start sm:self-auto ${
+                      aiAssessmentResult.confidenceLevel === 'HIGH'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : aiAssessmentResult.confidenceLevel === 'MEDIUM'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>
+                      {aiAssessmentResult.confidenceLevel} Confidence ({Math.round((aiAssessmentResult.confidence || 0) * 100)}%)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {/* Column 1: Classification */}
+                  <div className="space-y-3 bg-neutral-800/60 p-3.5 rounded-xl border border-neutral-800">
+                    <div>
+                      <span className="text-[10px] text-neutral-400 uppercase font-semibold">Detected Produce:</span>
+                      <div className="text-sm font-black text-white mt-0.5">
+                        {aiAssessmentResult.detectedProduce}
+                        {aiAssessmentResult.possibleVariety && (
+                          <span className="text-xs text-agri-orange-400 font-normal ml-1">
+                            ({aiAssessmentResult.possibleVariety})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-neutral-400 uppercase font-semibold">Recommended Quality Grade:</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="px-2.5 py-0.5 rounded-md bg-agri-orange-500 text-white font-extrabold text-xs">
+                          {aiAssessmentResult.recommendedQuality}
+                        </span>
+                        <span className="text-[10px] text-neutral-300">
+                          {aiAssessmentResult.recommendedQuality === 'Grade A'
+                            ? 'Optimal commercial standard (<5% surface marks)'
+                            : aiAssessmentResult.recommendedQuality === 'Grade B'
+                            ? 'Wholesale trade acceptable (<15% surface marks)'
+                            : 'Processing or discount distribution'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-neutral-700/60">
+                      <span className="text-neutral-400">Image Clarity:</span>
+                      <span className="font-bold text-neutral-200">{aiAssessmentResult.imageQuality}</span>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Observations & Indicators */}
+                  <div className="space-y-2 bg-neutral-800/60 p-3.5 rounded-xl border border-neutral-800">
+                    <span className="text-[10px] text-neutral-400 uppercase font-semibold block">
+                      Visible Defect & Uniformity Indicators:
+                    </span>
+                    <ul className="space-y-1 text-[11px] text-neutral-300">
+                      {aiAssessmentResult.visibleIndicators && aiAssessmentResult.visibleIndicators.length > 0 ? (
+                        aiAssessmentResult.visibleIndicators.map((ind, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-emerald-400 font-bold shrink-0">•</span>
+                            <span>{ind}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="text-neutral-500 italic">No surface defects detected.</li>
+                      )}
+                    </ul>
+
+                    {aiAssessmentResult.warnings && aiAssessmentResult.warnings.length > 0 && (
+                      <div className="pt-2 border-t border-neutral-700/60 space-y-1">
+                        <span className="text-[10px] text-amber-400 font-bold block">Advisories & Limits:</span>
+                        {aiAssessmentResult.warnings.map((w, wi) => (
+                          <div key={wi} className="text-[10px] text-neutral-400 flex items-start gap-1">
+                            <AlertCircle className="w-2.5 h-2.5 text-amber-400 shrink-0 mt-0.5" />
+                            <span>{w}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Farmer Decision Actions */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-neutral-800">
+                  <div className="text-[10px] text-neutral-400">
+                    {farmerAcceptedAi ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> AI recommendation applied to listing parameters below.
+                      </span>
+                    ) : (
+                      <span>You can apply the AI suggestion or choose your own grade in the form below.</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleAcceptAiRecommendation}
+                      className="flex-1 sm:flex-none px-4 py-1.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white font-extrabold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>Accept Recommendation</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFarmerAcceptedAi(false)}
+                      className="flex-1 sm:flex-none px-3 py-1.5 border border-neutral-700 hover:bg-neutral-800 text-neutral-300 font-medium rounded-lg text-xs transition-colors"
+                    >
+                      Edit Manually
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECTION 3: COMMERCIAL & HARVEST DETAILS FORM */}
+            <form onSubmit={handleAddProduce} className="space-y-3.5 text-xs">
+              <div className="pt-2 border-t border-neutral-100">
+                <h4 className="font-bold text-black uppercase tracking-wider mb-2 text-[11px]">
+                  Produce Specifications & Commercial Pricing
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-neutral-700 mb-1">Quantity (kg)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-neutral-700">Crop / Produce *</label>
+                    {farmerAcceptedAi && (
+                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        AI Verified
+                      </span>
+                    )}
+                  </div>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    value={newProduce.quantity}
-                    onChange={(e) => setNewProduce({ ...newProduce, quantity: Number(e.target.value) })}
+                    value={newProduce.product}
+                    onChange={(e) => setNewProduce({ ...newProduce, product: e.target.value })}
+                    placeholder="e.g. Tomato"
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Variety / Cultivar (Optional)</label>
+                  <input
+                    type="text"
+                    value={newProduce.variety}
+                    onChange={(e) => setNewProduce({ ...newProduce, variety: e.target.value })}
+                    placeholder="e.g. Vaishnavi Hybrid / Red Creole"
                     className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-neutral-700 mb-1">Quality Grade</label>
-                  <select
-                    value={newProduce.qualityGrade}
-                    onChange={(e) => setNewProduce({ ...newProduce, qualityGrade: e.target.value })}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
-                  >
-                    <option value="Grade A">Grade A (Premium)</option>
-                    <option value="Grade B">Grade B (Standard)</option>
-                    <option value="Grade C">Grade C (Processing)</option>
-                  </select>
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-neutral-700 mb-1">Expected Price (₹/kg)</label>
+                  <label className="block font-bold text-neutral-700 mb-1">Available Quantity (kg) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newProduce.quantity}
+                    onChange={(e) => setNewProduce({ ...newProduce, quantity: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-neutral-700">Confirmed Quality Grade *</label>
+                    {aiAssessmentResult && (
+                      <span className="text-[9px] text-neutral-400">
+                        (AI: {aiAssessmentResult.recommendedQuality})
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={newProduce.qualityGrade}
+                    onChange={(e) => {
+                      setNewProduce({ ...newProduce, qualityGrade: e.target.value });
+                      if (aiAssessmentResult && e.target.value !== aiAssessmentResult.recommendedQuality) {
+                        setFarmerAcceptedAi(false);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500 font-bold bg-white"
+                  >
+                    <option value="Grade A">Grade A (Premium - Uniform, High Cosmetic Standard)</option>
+                    <option value="Grade B">Grade B (Standard - Commercial Wholesale Standard)</option>
+                    <option value="Grade C">Grade C (Processing - Food Grade / Industrial Use)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Expected Price (₹ / kg) *</label>
                   <input
                     type="number"
                     step="0.5"
+                    min="1"
                     required
                     value={newProduce.expectedPricePerUnit}
                     onChange={(e) =>
                       setNewProduce({ ...newProduce, expectedPricePerUnit: Number(e.target.value) })
                     }
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500 font-bold text-agri-orange-600"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-neutral-700 mb-1">Available Date</label>
+                  <label className="block font-bold text-neutral-700 mb-1">Available / Harvest Date *</label>
                   <input
                     type="date"
                     required
@@ -1105,44 +1640,57 @@ export default function FarmerDashboard() {
                     className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
                   />
                 </div>
+
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Farm Location / District *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduce.location}
+                    onChange={(e) => setNewProduce({ ...newProduce, location: e.target.value })}
+                    placeholder="e.g. Vijayawada Rural, Krishna District, AP"
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-700 mb-1">Location / Farm District</label>
-                <input
-                  type="text"
-                  required
-                  value={newProduce.location}
-                  onChange={(e) => setNewProduce({ ...newProduce, location: e.target.value })}
-                  placeholder="e.g. Vijayawada Rural, AP"
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-neutral-700 mb-1">Lot Description / Notes</label>
+                <label className="block font-bold text-neutral-700 mb-1">Lot Description / Packaging Specs</label>
                 <textarea
                   rows={2}
                   value={newProduce.description}
                   onChange={(e) => setNewProduce({ ...newProduce, description: e.target.value })}
-                  placeholder="e.g. Greenhouse cultivated, sorted in standard 20kg crates."
+                  placeholder="e.g. Greenhouse harvested, sorted in standard 20kg crates, moisture controlled."
                   className="w-full px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:border-agri-orange-500"
                 />
               </div>
 
-              <div className="pt-3 flex justify-end gap-2">
+              {/* MANDATORY ADVISORY DISCLAIMER */}
+              <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-[10px] text-neutral-500 leading-relaxed flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Advisory Disclaimer:</strong> AgriLink AI visual quality assessment is an advisory tool based on uploaded photographs and does not substitute for physical, chemical, or lab testing where mandated. Final agreed contract terms are governed by buyer inspection upon dispatch.
+                </span>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-neutral-100">
                 <button
                   type="button"
-                  onClick={() => setShowAddProduceModal(false)}
-                  className="px-4 py-2 border border-neutral-200 text-neutral-700 rounded-xl font-bold hover:bg-neutral-50"
+                  onClick={() => {
+                    setShowAddProduceModal(false);
+                    setUploadedImages([]);
+                    setAiAssessmentResult(null);
+                  }}
+                  className="px-4 py-2 border border-neutral-200 text-neutral-700 rounded-xl font-bold hover:bg-neutral-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl font-bold shadow-sm"
+                  className="px-6 py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl font-extrabold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
                 >
-                  Publish Produce Lot
+                  <Check className="w-4 h-4" />
+                  <span>Publish Produce Lot</span>
                 </button>
               </div>
             </form>
@@ -1396,6 +1944,161 @@ export default function FarmerDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PRODUCE IMAGE INSPECTION MODAL */}
+      {selectedImageForPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setSelectedImageForPreview(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-neutral-900 rounded-3xl overflow-hidden border border-neutral-700 shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedImageForPreview(null)}
+              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center text-sm font-bold border border-white/20 transition-colors"
+            >
+              ✕
+            </button>
+            <img
+              src={selectedImageForPreview}
+              alt="High-resolution produce lot view"
+              className="w-full max-h-[82vh] object-contain rounded-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* FULL AI QUALITY ASSESSMENT REPORT MODAL */}
+      {selectedAiReportListing && selectedAiReportListing.aiAssessment && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setSelectedAiReportListing(null)}
+        >
+          <div
+            className="bg-neutral-900 text-white rounded-3xl max-w-2xl w-full p-6 border border-neutral-750 shadow-2xl space-y-5 my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between pb-3 border-b border-neutral-800">
+              <div>
+                <span className="text-[10px] font-extrabold text-agri-orange-400 bg-neutral-800 px-2.5 py-0.5 rounded-full border border-neutral-700 flex items-center gap-1 w-fit">
+                  <Sparkles className="w-3 h-3" /> AgriLink AI Visual Inspection Report
+                </span>
+                <h3 className="font-black text-lg text-white mt-1">
+                  Lot #{selectedAiReportListing._id?.slice(-5)}: {selectedAiReportListing.product}
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Visual quality classification powered by Google Gemini Vision.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedAiReportListing(null)}
+                className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quality Summary Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">AI Recommended</span>
+                <span className="text-base font-black text-white mt-0.5 block">
+                  {selectedAiReportListing.aiAssessment.recommendedQuality}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">Farmer Confirmed</span>
+                <span className="text-base font-black text-agri-orange-400 mt-0.5 block">
+                  {selectedAiReportListing.farmerConfirmedQuality || selectedAiReportListing.qualityGrade}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">Confidence Score</span>
+                <span className="text-base font-black text-emerald-400 mt-0.5 block">
+                  {Math.round((selectedAiReportListing.aiAssessment.confidence || 0) * 100)}% ({selectedAiReportListing.aiAssessment.confidenceLevel})
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">Image Clarity</span>
+                <span className="text-base font-black text-neutral-200 mt-0.5 block">
+                  {selectedAiReportListing.aiAssessment.imageQuality}
+                </span>
+              </div>
+            </div>
+
+            {/* Indicators & Observations */}
+            <div className="space-y-3 bg-neutral-800/50 p-4 rounded-2xl border border-neutral-800 text-xs">
+              <div>
+                <h4 className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Visible Quality & Sizing Indicators
+                </h4>
+                <ul className="space-y-1.5 text-neutral-300">
+                  {selectedAiReportListing.aiAssessment.visibleIndicators?.map((ind, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">•</span>
+                      <span>{ind}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {selectedAiReportListing.aiAssessment.warnings && selectedAiReportListing.aiAssessment.warnings.length > 0 && (
+                <div className="pt-3 border-t border-neutral-800">
+                  <h4 className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                    Advisories & Visual Limits
+                  </h4>
+                  <ul className="space-y-1 text-neutral-400 text-[11px]">
+                    {selectedAiReportListing.aiAssessment.warnings.map((w, wIdx) => (
+                      <li key={wIdx}>• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Photo Gallery Thumbnail Row */}
+            {selectedAiReportListing.imageUrls && selectedAiReportListing.imageUrls.length > 0 && (
+              <div>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-2">
+                  Evaluated Photographs ({selectedAiReportListing.imageUrls.length})
+                </span>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {selectedAiReportListing.imageUrls.map((url, imgIdx) => (
+                    <img
+                      key={imgIdx}
+                      src={url}
+                      alt={`Lot photo ${imgIdx + 1}`}
+                      className="w-16 h-16 object-cover rounded-xl border border-neutral-700 cursor-pointer hover:border-agri-orange-500 transition-colors shrink-0"
+                      onClick={() => setSelectedImageForPreview(url)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Disclaimer & Metadata */}
+            <div className="pt-3 border-t border-neutral-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[10px] text-neutral-500">
+              <span>
+                Model: {selectedAiReportListing.aiAssessment.modelVersion || 'Gemini Vision'} • Provider: Google Gemini
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedAiReportListing(null)}
+                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-colors self-end sm:self-auto"
+              >
+                Close Report
+              </button>
+            </div>
           </div>
         </div>
       )}

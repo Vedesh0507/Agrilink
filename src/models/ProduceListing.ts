@@ -21,6 +21,24 @@ export interface IProduceListingDocument extends Document {
   expiryDate?: Date;
   status: ProduceStatus;
   description?: string;
+  imageUrls?: string[];
+  aiAssessment?: {
+    detectedProduce?: string;
+    possibleVariety?: string | null;
+    recommendedQuality?: QualityGrade;
+    confidence?: number;
+    confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+    imageQuality?: string;
+    visibleIndicators?: string[];
+    warnings?: string[];
+    needsHumanReview?: boolean;
+    analyzedAt?: Date;
+    modelVersion?: string;
+    provider?: string;
+    farmerAccepted?: boolean;
+  };
+  farmerConfirmedQuality?: QualityGrade;
+  farmerConfirmedProduce?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +74,24 @@ const ProduceListingSchema = new Schema<IProduceListingDocument>(
       index: true,
     },
     description: { type: String, trim: true },
+    imageUrls: { type: [String], default: [] },
+    aiAssessment: {
+      detectedProduce: { type: String },
+      possibleVariety: { type: String },
+      recommendedQuality: { type: String, enum: ['Grade A', 'Grade B', 'Grade C'] },
+      confidence: { type: Number },
+      confidenceLevel: { type: String, enum: ['HIGH', 'MEDIUM', 'LOW'] },
+      imageQuality: { type: String },
+      visibleIndicators: { type: [String], default: [] },
+      warnings: { type: [String], default: [] },
+      needsHumanReview: { type: Boolean, default: false },
+      analyzedAt: { type: Date },
+      modelVersion: { type: String },
+      provider: { type: String },
+      farmerAccepted: { type: Boolean },
+    },
+    farmerConfirmedQuality: { type: String, enum: ['Grade A', 'Grade B', 'Grade C'] },
+    farmerConfirmedProduce: { type: String },
   },
   {
     timestamps: true,

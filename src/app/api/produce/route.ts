@@ -5,6 +5,8 @@ import { authenticateUser, authorizeRoles } from '@/lib/auth';
 import { ProduceListingSchema } from '@/validators';
 import { MatchingService } from '@/services/matchingService';
 
+import { saveProduceImage } from '@/lib/storage/imageStorage';
+
 // GET produce listings (with search & filtering)
 export async function GET(req: NextRequest) {
   try {
@@ -74,8 +76,26 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const data = validation.data;
 
+    // Process imageUrls if provided (save base64 data to public assets directory)
+    let processedImageUrls: string[] = [];
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      for (const imgUrl of data.imageUrls) {
+        if (imgUrl.startsWith('data:image/')) {
+          const mimeMatch = imgUrl.match(/^data:(image\/[a-zA-Z0-9.-]+);base64,/);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+          const savedUrl = await saveProduceImage(imgUrl, mimeType);
+          processedImageUrls.push(savedUrl);
+        } else {
+          processedImageUrls.push(imgUrl);
+        }
+      }
+    }
+
     const listing = await ProduceListing.create({
       ...data,
+      imageUrls: processedImageUrls,
+      farmerConfirmedQuality: data.farmerConfirmedQuality || data.qualityGrade,
+      farmerConfirmedProduce: data.farmerConfirmedProduce || data.product,
       farmerId: currentUser._id.toString(),
       farmerName: currentUser.name,
       availableQuantity: data.quantity,

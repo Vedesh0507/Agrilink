@@ -162,6 +162,10 @@ export default function AdminPortalPage() {
   // Print Invoice Modal
   const [activeInvoiceOrder, setActiveInvoiceOrder] = useState<any>(null);
 
+  // AI Assessment & Image Modals State
+  const [adminPreviewImage, setAdminPreviewImage] = useState<string | null>(null);
+  const [adminAiReportItem, setAdminAiReportItem] = useState<any | null>(null);
+
   useEffect(() => {
     const savedToken = sessionStorage.getItem('agrilink_admin_token');
     const savedUser = sessionStorage.getItem('agrilink_admin_user');
@@ -1553,30 +1557,110 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-3xl border border-neutral-200 overflow-hidden">
+                  <div className="bg-white rounded-3xl border border-neutral-200 overflow-hidden shadow-xs">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className="border-b border-neutral-100 text-neutral-400 font-semibold bg-neutral-50/50">
                             <th className="p-4">Farmer / Producer</th>
                             <th className="p-4">Commodity</th>
-                            <th className="p-4">Grade</th>
+                            <th className="p-4">Photos & Visuals</th>
+                            <th className="p-4">AI Visual Assessment</th>
+                            <th className="p-4">Confirmed Grade</th>
                             <th className="p-4">Available Qty</th>
                             <th className="p-4">Expected Price</th>
                             <th className="p-4">Hub Location</th>
                             <th className="p-4">Status</th>
+                            <th className="p-4 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100">
                           {metrics?.listingsData?.map((item: any) => (
                             <tr key={item._id} className="hover:bg-neutral-50 transition-colors">
-                              <td className="p-4 font-bold text-black">{item.farmerName}</td>
-                              <td className="p-4 font-medium text-black">{item.product}</td>
                               <td className="p-4">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100">
-                                  {item.qualityGrade}
-                                </span>
+                                <div className="font-bold text-black">{item.farmerName}</div>
+                                <div className="text-[10px] text-neutral-400">ID: #{item._id?.slice(-5)}</div>
                               </td>
+
+                              <td className="p-4 font-medium text-black">
+                                <div className="font-bold">{item.product}</div>
+                                {item.variety && <div className="text-[11px] text-neutral-500">{item.variety}</div>}
+                              </td>
+
+                              {/* Uploaded Photos Thumbnail */}
+                              <td className="p-4">
+                                {item.imageUrls && item.imageUrls.length > 0 ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <div
+                                      className="relative w-10 h-10 rounded-lg overflow-hidden border border-neutral-200 cursor-pointer group shrink-0"
+                                      onClick={() => setAdminPreviewImage(item.imageUrls[0])}
+                                    >
+                                      <img
+                                        src={item.imageUrls[0]}
+                                        alt={item.product}
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                      />
+                                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                        <Eye className="w-3 h-3" />
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-neutral-500">
+                                      {item.imageUrls.length} pic{item.imageUrls.length > 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-400 italic">No Photos</span>
+                                )}
+                              </td>
+
+                              {/* AI Visual Grade & Confidence */}
+                              <td className="p-4">
+                                {item.aiAssessment ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold flex items-center gap-1 ${
+                                          item.aiAssessment.confidenceLevel === 'HIGH'
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : item.aiAssessment.confidenceLevel === 'MEDIUM'
+                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                        }`}
+                                      >
+                                        <Sparkles className="w-2.5 h-2.5" />
+                                        {item.aiAssessment.recommendedQuality}
+                                      </span>
+                                      <span className="text-[10px] text-neutral-500 font-semibold">
+                                        {Math.round((item.aiAssessment.confidence || 0) * 100)}%
+                                      </span>
+                                    </div>
+                                    {item.aiAssessment.needsHumanReview && (
+                                      <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
+                                        Needs Review
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-500">
+                                    Manual Listing
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Confirmed Quality Grade */}
+                              <td className="p-4">
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-black text-white">
+                                  {item.farmerConfirmedQuality || item.qualityGrade}
+                                </span>
+                                {item.aiAssessment &&
+                                  item.farmerConfirmedQuality &&
+                                  item.farmerConfirmedQuality !== item.aiAssessment.recommendedQuality && (
+                                    <div className="text-[9px] text-amber-600 font-bold mt-1">
+                                      Override (AI: {item.aiAssessment.recommendedQuality})
+                                    </div>
+                                  )}
+                              </td>
+
                               <td className="p-4 font-bold text-black">{formatQuantity(item.availableQuantity)}</td>
                               <td className="p-4 font-bold text-agri-orange-600">₹{item.expectedPricePerUnit}/kg</td>
                               <td className="p-4 text-neutral-500">{item.location}</td>
@@ -1584,6 +1668,20 @@ export default function AdminPortalPage() {
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800">
                                   {item.status}
                                 </span>
+                              </td>
+
+                              {/* Actions */}
+                              <td className="p-4 text-right">
+                                {item.aiAssessment ? (
+                                  <button
+                                    onClick={() => setAdminAiReportItem(item)}
+                                    className="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-lg text-[10px] transition-colors"
+                                  >
+                                    AI Report
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-400">—</span>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -3401,6 +3499,162 @@ export default function AdminPortalPage() {
                 className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors"
               >
                 <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN PRODUCE PHOTO PREVIEW MODAL */}
+      {adminPreviewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setAdminPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-neutral-900 rounded-3xl overflow-hidden border border-neutral-700 shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setAdminPreviewImage(null)}
+              className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center text-sm font-bold border border-white/20 transition-colors"
+            >
+              ✕
+            </button>
+            <img
+              src={adminPreviewImage}
+              alt="Produce photo high resolution"
+              className="w-full max-h-[82vh] object-contain rounded-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN AI VISUAL ASSESSMENT REPORT MODAL */}
+      {adminAiReportItem && adminAiReportItem.aiAssessment && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setAdminAiReportItem(null)}
+        >
+          <div
+            className="bg-neutral-900 text-white rounded-3xl max-w-2xl w-full p-6 border border-neutral-800 shadow-2xl space-y-5 my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between pb-3 border-b border-neutral-800">
+              <div>
+                <span className="text-[10px] font-extrabold text-agri-orange-400 bg-neutral-800 px-2.5 py-0.5 rounded-full border border-neutral-700 flex items-center gap-1 w-fit">
+                  <Sparkles className="w-3 h-3" /> Admin Quality Audit & Inspection
+                </span>
+                <h3 className="font-black text-lg text-white mt-1">
+                  Lot #{adminAiReportItem._id?.slice(-5)}: {adminAiReportItem.product} ({adminAiReportItem.farmerName})
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Visual quality grading verified via Google Gemini AI.
+                </p>
+              </div>
+              <button
+                onClick={() => setAdminAiReportItem(null)}
+                className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Assessment Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">AI Recommended</span>
+                <span className="text-base font-black text-white mt-0.5 block">
+                  {adminAiReportItem.aiAssessment.recommendedQuality}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">Confirmed Grade</span>
+                <span className="text-base font-black text-agri-orange-400 mt-0.5 block">
+                  {adminAiReportItem.farmerConfirmedQuality || adminAiReportItem.qualityGrade}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">AI Confidence</span>
+                <span className="text-base font-black text-emerald-400 mt-0.5 block">
+                  {Math.round((adminAiReportItem.aiAssessment.confidence || 0) * 100)}% ({adminAiReportItem.aiAssessment.confidenceLevel})
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-neutral-800/80 border border-neutral-800">
+                <span className="text-[10px] text-neutral-400 block font-semibold">Image Clarity</span>
+                <span className="text-base font-black text-neutral-200 mt-0.5 block">
+                  {adminAiReportItem.aiAssessment.imageQuality}
+                </span>
+              </div>
+            </div>
+
+            {/* Indicators */}
+            <div className="space-y-3 bg-neutral-800/50 p-4 rounded-2xl border border-neutral-800 text-xs">
+              <div>
+                <h4 className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Visual Characteristics & Uniformity Indicators
+                </h4>
+                <ul className="space-y-1.5 text-neutral-300">
+                  {adminAiReportItem.aiAssessment.visibleIndicators?.map((ind: string, idx: number) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-emerald-400 font-bold">•</span>
+                      <span>{ind}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {adminAiReportItem.aiAssessment.warnings && adminAiReportItem.aiAssessment.warnings.length > 0 && (
+                <div className="pt-3 border-t border-neutral-800">
+                  <h4 className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                    Inspection Advisories & Limits
+                  </h4>
+                  <ul className="space-y-1 text-neutral-400 text-[11px]">
+                    {adminAiReportItem.aiAssessment.warnings.map((w: string, wIdx: number) => (
+                      <li key={wIdx}>• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Images */}
+            {adminAiReportItem.imageUrls && adminAiReportItem.imageUrls.length > 0 && (
+              <div>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-2">
+                  Audited Lot Photographs ({adminAiReportItem.imageUrls.length})
+                </span>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {adminAiReportItem.imageUrls.map((url: string, imgIdx: number) => (
+                    <img
+                      key={imgIdx}
+                      src={url}
+                      alt={`Lot photo ${imgIdx + 1}`}
+                      className="w-16 h-16 object-cover rounded-xl border border-neutral-700 cursor-pointer hover:border-agri-orange-500 transition-colors shrink-0"
+                      onClick={() => setAdminPreviewImage(url)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-neutral-800 flex items-center justify-between text-[10px] text-neutral-500">
+              <span>
+                Engine: {adminAiReportItem.aiAssessment.modelVersion || 'Gemini 3.6 Flash'} • Human Review Flag:{' '}
+                {adminAiReportItem.aiAssessment.needsHumanReview ? 'YES' : 'NO'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAdminAiReportItem(null)}
+                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-colors"
+              >
+                Dismiss
               </button>
             </div>
           </div>

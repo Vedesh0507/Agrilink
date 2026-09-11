@@ -102,6 +102,25 @@ export interface IOrganization {
   updatedAt?: string | Date;
 }
 
+export type AIConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+export type AIImageQuality = 'GOOD' | 'ACCEPTABLE' | 'POOR' | 'BLURRY' | 'DARK' | 'INSUFFICIENT';
+
+export interface IAIAssessment {
+  detectedProduce: string;
+  possibleVariety?: string | null;
+  recommendedQuality: QualityGrade;
+  confidence: number;
+  confidenceLevel: AIConfidenceLevel;
+  imageQuality: AIImageQuality;
+  visibleIndicators: string[];
+  warnings: string[];
+  needsHumanReview: boolean;
+  analyzedAt: string | Date;
+  modelVersion: string;
+  provider: string;
+  farmerAccepted?: boolean;
+}
+
 export interface IProduceListing {
   _id?: string;
   farmerId: string; // Mongo User ID or Firebase UID
@@ -123,6 +142,10 @@ export interface IProduceListing {
   expiryDate?: string | Date;
   status: ProduceStatus;
   description?: string;
+  imageUrls?: string[];
+  aiAssessment?: IAIAssessment;
+  farmerConfirmedQuality?: QualityGrade;
+  farmerConfirmedProduce?: string;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
