@@ -2423,11 +2423,33 @@ export default function AdminPortalPage() {
                             subscriptionsList.map((sub: any) => (
                               <tr key={sub._id} className="hover:bg-neutral-50">
                                 <td className="p-4">
-                                  <div className="font-extrabold text-black text-xs">
-                                    {sub.organizationId?.name || 'Commercial Procurement Entity'}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-extrabold text-black text-xs">
+                                      {sub.organizationId?.name || 'Commercial Procurement Entity'}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-neutral-200 text-neutral-800 uppercase">
+                                      {sub.organizationId?.type || 'WHOLESALER'}
+                                    </span>
                                   </div>
-                                  <div className="text-[11px] text-neutral-400">
-                                    {sub.organizationId?.contactPerson || sub.organizationId?.email || 'Registered Buyer'}
+                                  <div className="text-[11px] text-neutral-600 flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="font-medium text-black">👤 {sub.organizationId?.contactPerson || 'Buyer'}</span>
+                                    {sub.organizationId?.phone && <span>• 📞 {sub.organizationId?.phone}</span>}
+                                    {sub.organizationId?.email && <span>• ✉️ {sub.organizationId?.email}</span>}
+                                  </div>
+                                  <div className="text-[10px] text-neutral-500 flex flex-wrap items-center gap-2 mt-1">
+                                    {sub.organizationId?.address?.city && (
+                                      <span>📍 {sub.organizationId?.address?.city}, {sub.organizationId?.address?.state || 'AP'}</span>
+                                    )}
+                                    {sub.organizationId?.gstin ? (
+                                      <span className="font-mono bg-neutral-100 border border-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                        GSTIN: {sub.organizationId?.gstin}
+                                      </span>
+                                    ) : (
+                                      <span className="text-neutral-400 text-[9px]">No GSTIN</span>
+                                    )}
+                                    {sub.organizationId?.procurementVolume && (
+                                      <span className="text-neutral-500 font-medium">📦 {sub.organizationId?.procurementVolume}</span>
+                                    )}
                                   </div>
                                 </td>
 
@@ -2441,6 +2463,9 @@ export default function AdminPortalPage() {
                                   }`}>
                                     {sub.planCode}
                                   </span>
+                                  <div className="text-[10px] font-bold text-neutral-500 mt-1">
+                                    ₹{(sub.planId?.priceMonthly ?? (sub.planCode === 'BUSINESS' ? 4999 : sub.planCode === 'ENTERPRISE' ? 19999 : 0)).toLocaleString('en-IN')}/mo
+                                  </div>
                                   {sub.isComplimentary && (
                                     <span className="block text-[9px] text-agri-orange-600 font-bold mt-0.5">
                                       Complimentary
@@ -2478,7 +2503,18 @@ export default function AdminPortalPage() {
                                 </td>
 
                                 <td className="p-4 text-right">
-                                  <div className="flex items-center justify-end gap-1.5">
+                                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedItem(sub);
+                                        setModalType('VIEW_ORGANIZATION_DOSSIER');
+                                      }}
+                                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold flex items-center gap-1"
+                                      title="View Organization Profile & Basic Details"
+                                    >
+                                      <Eye className="w-3 h-3" /> Details
+                                    </button>
+
                                     <button
                                       onClick={() => {
                                         setSelectedItem(sub);
@@ -3051,12 +3087,12 @@ export default function AdminPortalPage() {
       {/* MODAL: ADMIN ACTION CONFIRMATION WITH REASON */}
       {modalType && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-neutral-200 animate-scale-in">
+          <div className={`bg-white rounded-3xl ${modalType === 'VIEW_ORGANIZATION_DOSSIER' ? 'max-w-lg' : 'max-w-md'} w-full p-6 space-y-4 shadow-2xl border border-neutral-200 animate-scale-in`}>
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-agri-orange-500" />
                 <h3 className="font-black text-sm text-black uppercase tracking-wider">
-                  Admin Action Verification
+                  {modalType === 'VIEW_ORGANIZATION_DOSSIER' ? 'Buyer Organization Dossier' : 'Admin Action Verification'}
                 </h3>
               </div>
               <button onClick={closeModal} className="p-1 hover:bg-neutral-100 rounded-lg text-neutral-500">
@@ -3076,130 +3112,195 @@ export default function AdminPortalPage() {
               </div>
             )}
 
-            <div className="text-xs text-neutral-600 space-y-2">
-              <p>
-                Target Operation: <strong>{modalType}</strong>
-              </p>
-              {selectedItem && (
-                <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 font-mono text-[11px] text-neutral-600">
-                  Target: {selectedItem.name || selectedItem.orderNumber || selectedItem.product || selectedItem._id}
+            {modalType === 'VIEW_ORGANIZATION_DOSSIER' && selectedItem ? (
+              <div className="space-y-4 text-xs">
+                {/* Organization Details Header */}
+                <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-sm text-black">
+                      {selectedItem.organizationId?.name || 'Registered Procurement Enterprise'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-neutral-200 text-neutral-800">
+                      {selectedItem.organizationId?.type || 'WHOLESALER'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-neutral-600 pt-1">
+                    <div>👤 <strong>Contact:</strong> {selectedItem.organizationId?.contactPerson || 'Buyer'}</div>
+                    <div>📞 <strong>Phone:</strong> {selectedItem.organizationId?.phone || 'N/A'}</div>
+                    <div>✉️ <strong>Email:</strong> {selectedItem.organizationId?.email || 'N/A'}</div>
+                    <div>📍 <strong>Mandi/City:</strong> {selectedItem.organizationId?.address?.city || 'Guntur'}, {selectedItem.organizationId?.address?.state || 'AP'}</div>
+                    <div>🧾 <strong>GSTIN:</strong> {selectedItem.organizationId?.gstin || 'Not Provided'}</div>
+                    <div>📦 <strong>Monthly Vol:</strong> {selectedItem.organizationId?.procurementVolume || '10-50 MT'}</div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Sub-inputs depending on action */}
-            {modalType === 'USER_STATUS' && (
-              <div>
-                <label className="block font-bold text-neutral-700 text-xs mb-1">New Account Status</label>
-                <select
-                  value={actionStatusInput}
-                  onChange={(e) => setActionStatusInput(e.target.value)}
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="SUSPENDED">SUSPENDED</option>
-                  <option value="UNDER_REVIEW">UNDER_REVIEW</option>
-                  <option value="BANNED">BANNED</option>
-                </select>
-              </div>
-            )}
+                {/* Subscription Tier Details */}
+                <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-950">Active Tier & Quota</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800">
+                      {selectedItem.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-amber-900">
+                    <div>Plan: <strong>{selectedItem.planCode}</strong></div>
+                    <div>Price: <strong>₹{(selectedItem.planId?.priceMonthly ?? (selectedItem.planCode === 'BUSINESS' ? 4999 : selectedItem.planCode === 'ENTERPRISE' ? 19999 : 0)).toLocaleString('en-IN')}/mo</strong></div>
+                    <div>Monthly Quota: <strong>{selectedItem.monthlyRequirementsUsed} / {selectedItem.planId?.features?.maxMonthlyRequirements === -1 ? 'Unlimited' : (selectedItem.planId?.features?.maxMonthlyRequirements || 5)}</strong></div>
+                    <div>Trade Fee: <strong>{selectedItem.planId?.features?.transactionFeePercentage || (selectedItem.planCode === 'FREE' ? 2.5 : selectedItem.planCode === 'BUSINESS' ? 1.5 : 1.0)}%</strong></div>
+                    <div>Period End: <strong>{new Date(selectedItem.currentPeriodEnd).toLocaleDateString()}</strong></div>
+                    <div>Provider: <strong>{selectedItem.paymentProvider || 'INTERNAL_LEDGER'}</strong></div>
+                  </div>
+                </div>
 
-            {(modalType === 'RESOLVE_DISPUTE' || modalType === 'MANUAL_LEDGER_ENTRY') && (
-              <div>
-                <label className="block font-bold text-neutral-700 text-xs mb-1">Settlement Amount (INR)</label>
-                <input
-                  type="number"
-                  value={actionAmountInput}
-                  onChange={(e) => setActionAmountInput(Number(e.target.value))}
-                  placeholder="Enter amount in ₹"
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
-                />
-              </div>
-            )}
-
-            {modalType === 'SUBSCRIPTION_ACTION' && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block font-bold text-neutral-700 text-xs mb-1">Administrative Action</label>
-                  <select
-                    value={actionStatusInput}
-                    onChange={(e) => setActionStatusInput(e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-bold transition-colors"
                   >
-                    <option value="CHANGE_PLAN">Change Plan</option>
-                    <option value="GRANT_COMPLIMENTARY">Grant Controlled Complimentary</option>
-                    <option value="SUSPEND_SUBSCRIPTION">Suspend Subscription</option>
-                    <option value="ACTIVATE_SUBSCRIPTION">Re-Activate Subscription</option>
-                  </select>
+                    Close Dossier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionStatusInput('CHANGE_PLAN');
+                      setActionNotesInput(selectedItem.planCode === 'FREE' ? 'BUSINESS' : 'ENTERPRISE');
+                      setModalType('SUBSCRIPTION_ACTION');
+                    }}
+                    className="px-4 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+                  >
+                    Manage Plan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-xs text-neutral-600 space-y-2">
+                  <p>
+                    Target Operation: <strong>{modalType}</strong>
+                  </p>
+                  {selectedItem && (
+                    <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 font-mono text-[11px] text-neutral-600">
+                      Target: {selectedItem.name || selectedItem.orderNumber || selectedItem.product || selectedItem._id}
+                    </div>
+                  )}
                 </div>
 
-                {(actionStatusInput === 'CHANGE_PLAN' || actionStatusInput === 'GRANT_COMPLIMENTARY') && (
+                {/* Sub-inputs depending on action */}
+                {modalType === 'USER_STATUS' && (
                   <div>
-                    <label className="block font-bold text-neutral-700 text-xs mb-1">Target Plan</label>
+                    <label className="block font-bold text-neutral-700 text-xs mb-1">New Account Status</label>
                     <select
-                      value={actionNotesInput || 'BUSINESS'}
-                      onChange={(e) => setActionNotesInput(e.target.value)}
+                      value={actionStatusInput}
+                      onChange={(e) => setActionStatusInput(e.target.value)}
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
                     >
-                      <option value="FREE">Free / Trial (₹0/mo)</option>
-                      <option value="BUSINESS">Business Growth (₹4,999/mo)</option>
-                      <option value="ENTERPRISE">Enterprise Procurement (₹19,999/mo)</option>
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="SUSPENDED">SUSPENDED</option>
+                      <option value="UNDER_REVIEW">UNDER_REVIEW</option>
+                      <option value="BANNED">BANNED</option>
                     </select>
                   </div>
                 )}
 
-                {actionStatusInput === 'GRANT_COMPLIMENTARY' && (
+                {(modalType === 'RESOLVE_DISPUTE' || modalType === 'MANUAL_LEDGER_ENTRY') && (
                   <div>
-                    <label className="block font-bold text-neutral-700 text-xs mb-1">Duration (Months)</label>
+                    <label className="block font-bold text-neutral-700 text-xs mb-1">Settlement Amount (INR)</label>
                     <input
                       type="number"
-                      min="1"
-                      max="12"
-                      value={actionAmountInput || 1}
+                      value={actionAmountInput}
                       onChange={(e) => setActionAmountInput(Number(e.target.value))}
+                      placeholder="Enter amount in ₹"
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
                     />
                   </div>
                 )}
-              </div>
+
+                {modalType === 'SUBSCRIPTION_ACTION' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block font-bold text-neutral-700 text-xs mb-1">Administrative Action</label>
+                      <select
+                        value={actionStatusInput}
+                        onChange={(e) => setActionStatusInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                      >
+                        <option value="CHANGE_PLAN">Change Plan</option>
+                        <option value="GRANT_COMPLIMENTARY">Grant Controlled Complimentary</option>
+                        <option value="SUSPEND_SUBSCRIPTION">Suspend Subscription</option>
+                        <option value="ACTIVATE_SUBSCRIPTION">Re-Activate Subscription</option>
+                      </select>
+                    </div>
+
+                    {(actionStatusInput === 'CHANGE_PLAN' || actionStatusInput === 'GRANT_COMPLIMENTARY') && (
+                      <div>
+                        <label className="block font-bold text-neutral-700 text-xs mb-1">Target Plan</label>
+                        <select
+                          value={actionNotesInput || 'BUSINESS'}
+                          onChange={(e) => setActionNotesInput(e.target.value)}
+                          className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                        >
+                          <option value="FREE">Free / Trial (₹0/mo)</option>
+                          <option value="BUSINESS">Business Growth (₹4,999/mo)</option>
+                          <option value="ENTERPRISE">Enterprise Procurement (₹19,999/mo)</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {actionStatusInput === 'GRANT_COMPLIMENTARY' && (
+                      <div>
+                        <label className="block font-bold text-neutral-700 text-xs mb-1">Duration (Months)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="12"
+                          value={actionAmountInput || 1}
+                          onChange={(e) => setActionAmountInput(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* MANDATORY REASON FIELD */}
+                <div>
+                  <label className="block font-bold text-neutral-700 text-xs mb-1">
+                    Operational Reason / Justification <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={actionReason}
+                    onChange={(e) => setActionReason(e.target.value)}
+                    placeholder="Reason for audit log (minimum 5 characters)..."
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-black"
+                  />
+                  <span className="text-[10px] text-neutral-400">
+                    Logged with your administrator credentials and timestamp in immutable storage.
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteAdminAction}
+                    disabled={submittingAction}
+                    className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    {submittingAction && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    Confirm & Log Mutation
+                  </button>
+                </div>
+              </>
             )}
-
-            {/* MANDATORY REASON FIELD */}
-            <div>
-              <label className="block font-bold text-neutral-700 text-xs mb-1">
-                Operational Reason / Justification <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                required
-                rows={3}
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
-                placeholder="Reason for audit log (minimum 5 characters)..."
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-black"
-              />
-              <span className="text-[10px] text-neutral-400">
-                Logged with your administrator credentials and timestamp in immutable storage.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-bold transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExecuteAdminAction}
-                disabled={submittingAction}
-                className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-              >
-                {submittingAction && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                Confirm & Log Mutation
-              </button>
-            </div>
           </div>
         </div>
       )}

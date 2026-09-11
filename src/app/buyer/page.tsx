@@ -62,6 +62,15 @@ export default function BuyerDashboard() {
   const [upgradingPlan, setUpgradingPlan] = useState(false);
   const [upgradeFeedback, setUpgradeFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Upgrade modal basic organization details
+  const [buyerOrgName, setBuyerOrgName] = useState('');
+  const [buyerContactPerson, setBuyerContactPerson] = useState('');
+  const [buyerPhone, setBuyerPhone] = useState('');
+  const [buyerGstin, setBuyerGstin] = useState('');
+  const [buyerBusinessType, setBuyerBusinessType] = useState('WHOLESALER');
+  const [buyerCity, setBuyerCity] = useState('');
+  const [buyerState, setBuyerState] = useState('Andhra Pradesh');
+
   // Modals & Actions
   const [showAddReqModal, setShowAddReqModal] = useState(false);
   const [showCounterModal, setShowCounterModal] = useState(false);
@@ -177,6 +186,13 @@ export default function BuyerDashboard() {
         },
         body: JSON.stringify({
           targetPlanCode: selectedTargetPlan,
+          companyName: buyerOrgName.trim(),
+          contactPerson: buyerContactPerson.trim(),
+          phone: buyerPhone.trim(),
+          gstin: buyerGstin.trim().toUpperCase(),
+          businessType: buyerBusinessType,
+          city: buyerCity.trim(),
+          state: buyerState.trim(),
           reason: upgradeReason || `Self-serve plan change to ${selectedTargetPlan}`,
         }),
       });
@@ -1908,6 +1924,87 @@ export default function BuyerDashboard() {
                     </label>
                   );
                 })}
+              </div>
+
+              {/* Basic Organization Profile Details */}
+              <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-3">
+                <div className="font-bold text-neutral-800 text-xs flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-agri-orange-500" />
+                  <span>Verify / Update Organization Billing Profile</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">Company / Enterprise Name</label>
+                    <input
+                      type="text"
+                      value={buyerOrgName}
+                      onChange={(e) => setBuyerOrgName(e.target.value)}
+                      placeholder="e.g. Sri Krishna Wholesalers"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">Contact Person</label>
+                    <input
+                      type="text"
+                      value={buyerContactPerson}
+                      onChange={(e) => setBuyerContactPerson(e.target.value)}
+                      placeholder="e.g. Ramesh Kumar"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">Contact Phone</label>
+                    <input
+                      type="tel"
+                      value={buyerPhone}
+                      onChange={(e) => setBuyerPhone(e.target.value)}
+                      placeholder="e.g. +91 9876543210"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">Business Type</label>
+                    <select
+                      value={buyerBusinessType}
+                      onChange={(e) => setBuyerBusinessType(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                    >
+                      <option value="WHOLESALER">Mandi Wholesaler / Commission Agent</option>
+                      <option value="RETAILER">Supermarket / Retail Grocery Chain</option>
+                      <option value="PROCESSOR">Food Processing & Milling Mill</option>
+                      <option value="EXPORTER">Agricultural Commodity Exporter</option>
+                      <option value="INSTITUTION">HORECA / Restaurant Chain</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">GSTIN Number (Optional)</label>
+                    <input
+                      type="text"
+                      maxLength={15}
+                      value={buyerGstin}
+                      onChange={(e) => setBuyerGstin(e.target.value.toUpperCase())}
+                      placeholder="e.g. 36AAAAA0000A1Z5"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl font-mono text-xs focus:outline-none focus:border-agri-orange-500 uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-600 font-semibold mb-1">City / Mandi</label>
+                    <input
+                      type="text"
+                      value={buyerCity}
+                      onChange={(e) => setBuyerCity(e.target.value)}
+                      placeholder="e.g. Guntur"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
