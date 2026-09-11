@@ -30,6 +30,13 @@ export default function Navbar() {
           </div>
         </Link>
 
+        {/* Center / Navigation Links */}
+        <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-neutral-600">
+          <Link href="/pricing" className="hover:text-agri-orange-600 transition-colors">
+            Pricing & Plans
+          </Link>
+        </nav>
+
         {/* Right: Language Switcher & User Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Multi-Language Selector Toggle */}

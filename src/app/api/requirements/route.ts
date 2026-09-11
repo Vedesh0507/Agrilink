@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { BuyerRequirement, ProduceListing, Match, AuditLog, Notification, User } from '@/models';
+import { BuyerRequirement, ProduceListing, Match, AuditLog, Notification, User, Organization } from '@/models';
 import { authenticateUser, authorizeRoles } from '@/lib/auth';
 import { BuyerRequirementSchema } from '@/validators';
 import { MatchingService } from '@/services/matchingService';
+import { canCreateRequirement, recordRequirementUsage } from '@/lib/entitlement';
 
 // GET buyer requirements
 export async function GET(req: NextRequest) {
@@ -71,6 +72,42 @@ export async function POST(req: NextRequest) {
     }
 
     await connectToDatabase();
+
+    // Resolve buyer organization for subscription entitlement verification
+    let orgId = currentUser.organizationId as any;
+    if (!orgId) {
+      let org = await Organization.findOne({ email: currentUser.email });
+      if (!org) {
+        org = await Organization.create({
+          name: `${currentUser.name} Commercial Enterprise`,
+          type: 'WHOLESALER',
+          contactPerson: currentUser.name,
+          email: currentUser.email,
+          phone: currentUser.phone || '',
+          verified: true,
+        });
+      }
+      currentUser.organizationId = org._id as any;
+      await currentUser.save();
+      orgId = org._id;
+    }
+
+    // Enforce server-side subscription entitlement
+    const entitlement = await canCreateRequirement(orgId);
+    if (!entitlement.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: entitlement.reason,
+          code: 'PLAN_LIMIT_REACHED',
+          currentUsed: entitlement.currentUsed,
+          limit: entitlement.limit,
+          planCode: entitlement.planCode,
+        },
+        { status: 403 }
+      );
+    }
+
     const data = validation.data;
 
     const requirement = await BuyerRequirement.create({
@@ -81,6 +118,10 @@ export async function POST(req: NextRequest) {
       status: 'OPEN',
       fulfilledQuantity: 0,
     });
+
+    // Record requirement usage against subscription counter
+    await recordRequirementUsage(orgId);
+
 
     // Run deterministic matching engine immediately against available produce supply
     const availableListings = await ProduceListing.find({ status: 'AVAILABLE', availableQuantity: { $gt: 0 } });

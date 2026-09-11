@@ -58,6 +58,8 @@ type AdminModuleId =
   | 'orders'
   | 'delays'
   | 'disputes'
+  | 'revenue'
+  | 'subscriptions'
   | 'ledger'
   | 'invoicing'
   | 'commission'
@@ -128,6 +130,17 @@ export default function AdminPortalPage() {
   const [platformConfig, setPlatformConfig] = useState<any>(null);
   const [configSaving, setConfigSaving] = useState(false);
   const [configMessage, setConfigMessage] = useState('');
+
+  // Subscriptions & Revenue State
+  const [subscriptionsList, setSubscriptionsList] = useState<any[]>([]);
+  const [subscriptionsSummary, setSubscriptionsSummary] = useState<any>(null);
+  const [subscriptionPlanFilter, setSubscriptionPlanFilter] = useState('ALL');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('ALL');
+  const [subscriptionSearch, setSubscriptionSearch] = useState('');
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+
+  const [revenueData, setRevenueData] = useState<any>(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
 
   // Action Modals State
   const [modalType, setModalType] = useState<string | null>(null);
@@ -333,6 +346,38 @@ export default function AdminPortalPage() {
     }
   };
 
+  const fetchSubscriptions = async () => {
+    setLoadingSubscriptions(true);
+    try {
+      const url = `/api/admin/subscriptions?plan=${subscriptionPlanFilter}&status=${subscriptionStatusFilter}&search=${encodeURIComponent(subscriptionSearch)}`;
+      const res = await fetch(url, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setSubscriptionsList(data.data.subscriptions || []);
+        setSubscriptionsSummary(data.data.summary || null);
+      }
+    } catch (err) {
+      console.error('Failed to load subscriptions:', err);
+    } finally {
+      setLoadingSubscriptions(false);
+    }
+  };
+
+  const fetchRevenue = async () => {
+    setLoadingRevenue(true);
+    try {
+      const res = await fetch('/api/admin/revenue', { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setRevenueData(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load revenue analytics:', err);
+    } finally {
+      setLoadingRevenue(false);
+    }
+  };
+
   // Trigger data fetching when module activates
   useEffect(() => {
     if (!isAdminAuthenticated) return;
@@ -343,6 +388,8 @@ export default function AdminPortalPage() {
     if (activeModule === 'ledger' || activeModule === 'invoicing') fetchLedger();
     if (activeModule === 'tickets') fetchTickets();
     if (activeModule === 'feature_flags' || activeModule === 'commission') fetchPlatformConfig();
+    if (activeModule === 'subscriptions') fetchSubscriptions();
+    if (activeModule === 'revenue') fetchRevenue();
   }, [activeModule, isAdminAuthenticated]);
 
   const handleReSeed = async () => {
@@ -517,6 +564,26 @@ export default function AdminPortalPage() {
         } else {
           setActionFeedback({ success: false, message: data.error });
         }
+      } else if (modalType === 'SUBSCRIPTION_ACTION') {
+        const res = await fetch('/api/admin/subscriptions', {
+          method: 'POST',
+          headers: getHeaders(idempotencyKey),
+          body: JSON.stringify({
+            subscriptionId: selectedItem._id,
+            action: actionStatusInput, // 'CHANGE_PLAN' | 'SUSPEND_SUBSCRIPTION' | 'ACTIVATE_SUBSCRIPTION' | 'GRANT_COMPLIMENTARY'
+            targetPlanCode: actionNotesInput || 'BUSINESS',
+            durationMonths: Number(actionAmountInput) || 1,
+            reason: actionReason,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setActionFeedback({ success: true, message: data.message });
+          fetchSubscriptions();
+          setTimeout(() => closeModal(), 1500);
+        } else {
+          setActionFeedback({ success: false, message: data.error });
+        }
       }
     } catch (err: any) {
       setActionFeedback({ success: false, message: err.message });
@@ -640,9 +707,11 @@ export default function AdminPortalPage() {
       ],
     },
     {
-      title: 'Finance & Governance',
+      title: 'Finance & Monetization',
       icon: CreditCard,
       items: [
+        { id: 'revenue', label: 'Revenue & Growth Analytics' },
+        { id: 'subscriptions', label: 'Buyer Subscriptions', badge: subscriptionsSummary?.totalActive ? `${subscriptionsSummary.totalActive} Active` : undefined },
         { id: 'ledger', label: 'Settlement Ledger' },
         { id: 'invoicing', label: 'GST Invoicing & Taxes' },
         { id: 'commission', label: 'Platform Commission Policy' },
@@ -2004,6 +2073,472 @@ export default function AdminPortalPage() {
                 </div>
               )}
 
+              {/* MODULE: REVENUE & GROWTH ANALYTICS */}
+              {activeModule === 'revenue' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-black">Revenue, SaaS Monetization & Financial Governance</h2>
+                      <p className="text-xs text-neutral-500">
+                        Auditable financial accounting across Gross GMV, Platform Transaction Fees, SaaS Subscriptions, MRR, and GST Output Liabilities
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={fetchRevenue}
+                      className="px-3.5 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingRevenue ? 'animate-spin' : ''}`} /> Refresh Financials
+                    </button>
+                  </div>
+
+                  {loadingRevenue ? (
+                    <div className="p-12 text-center text-neutral-400 font-bold text-xs">
+                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-neutral-500" />
+                      Reconciling platform revenue and transaction ledger...
+                    </div>
+                  ) : (
+                    <>
+                      {/* Top 4 Primary Financial KPI Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-xs">
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                            Gross GMV (Platform Trades)
+                          </span>
+                          <div className="text-2xl sm:text-3xl font-black text-black mt-1">
+                            {formatCurrency(revenueData?.kpis?.grossGMV || 0)}
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-1">
+                            {revenueData?.kpis?.completedOrdersCount || 0} executed B2B contracts
+                          </div>
+                        </div>
+
+                        <div className="p-5 rounded-3xl bg-black text-white border border-neutral-800 shadow-md">
+                          <span className="text-[10px] font-bold text-agri-orange-400 uppercase tracking-wider">
+                            Gross Platform Revenue
+                          </span>
+                          <div className="text-2xl sm:text-3xl font-black text-white mt-1">
+                            {formatCurrency(revenueData?.kpis?.grossPlatformRevenue || 0)}
+                          </div>
+                          <div className="text-[10px] text-neutral-400 mt-1">
+                            Subscriptions + Transaction Fees
+                          </div>
+                        </div>
+
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-xs">
+                          <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">
+                            Monthly Recurring Revenue (MRR)
+                          </span>
+                          <div className="text-2xl sm:text-3xl font-black text-green-700 mt-1">
+                            {formatCurrency(revenueData?.kpis?.mrr || 0)}
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-1">
+                            Annualized ARR: {formatCurrency(revenueData?.kpis?.arr || 0)}
+                          </div>
+                        </div>
+
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-xs">
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                            Avg Revenue / Buyer (ARPU)
+                          </span>
+                          <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-1">
+                            {formatCurrency(revenueData?.kpis?.arpu || 0)}
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-1">
+                            Across {revenueData?.kpis?.totalBuyersCount || 0} registered buyers
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Revenue Source Breakdown */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 space-y-1">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase">Trade Transaction Fees</div>
+                          <div className="text-xl font-black text-black">
+                            {formatCurrency(revenueData?.kpis?.totalTransactionFeeRevenue || 0)}
+                          </div>
+                          <p className="text-[11px] text-neutral-500">
+                            Collected from completed delivery settlements
+                          </p>
+                        </div>
+
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 space-y-1">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase">SaaS Subscriptions Revenue</div>
+                          <div className="text-xl font-black text-black">
+                            {formatCurrency(revenueData?.kpis?.totalSubscriptionRevenue || 0)}
+                          </div>
+                          <p className="text-[11px] text-neutral-500">
+                            Business & Enterprise recurring billing
+                          </p>
+                        </div>
+
+                        <div className="p-5 rounded-3xl bg-white border border-neutral-200 space-y-1">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase">GST Output Tax (18%)</div>
+                          <div className="text-xl font-black text-neutral-800">
+                            {formatCurrency(revenueData?.kpis?.totalPlatformTaxes || 0)}
+                          </div>
+                          <p className="text-[11px] text-neutral-500">
+                            Statutory service tax accrued for filing
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Recent Transaction Fees Table */}
+                      <div className="bg-white rounded-3xl border border-neutral-200 p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-extrabold text-sm text-black">
+                              Recent Executed Trade Transaction Fees
+                            </h3>
+                            <p className="text-xs text-neutral-500">
+                              Exact fee snapshots immutable finalized upon quotation acceptance
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-neutral-100 text-neutral-400 font-semibold">
+                                <th className="pb-3">Order Number</th>
+                                <th className="pb-3">Gross Trade Value</th>
+                                <th className="pb-3">Fee Rate</th>
+                                <th className="pb-3">Platform Fee</th>
+                                <th className="pb-3">GST Tax</th>
+                                <th className="pb-3">Supplier Net Payable</th>
+                                <th className="pb-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100">
+                              {revenueData?.recentTransactionFees?.length > 0 ? (
+                                revenueData.recentTransactionFees.map((fee: any) => (
+                                  <tr key={fee._id} className="hover:bg-neutral-50">
+                                    <td className="py-3 font-mono font-bold text-black">{fee.orderNumber}</td>
+                                    <td className="py-3 font-bold text-neutral-900">{formatCurrency(fee.grossAmount)}</td>
+                                    <td className="py-3 font-bold text-agri-orange-600">{fee.feePercentage}%</td>
+                                    <td className="py-3 font-semibold text-neutral-800">{formatCurrency(fee.feeAmount)}</td>
+                                    <td className="py-3 text-neutral-500">{formatCurrency(fee.taxAmount)}</td>
+                                    <td className="py-3 font-black text-black">{formatCurrency(fee.supplierPayableAmount)}</td>
+                                    <td className="py-3">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                        {fee.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td colSpan={7} className="p-6 text-center text-neutral-400">
+                                    Zero transaction fee records yet.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Recent Subscription Invoices Table */}
+                      <div className="bg-white rounded-3xl border border-neutral-200 p-6 space-y-4">
+                        <div>
+                          <h3 className="font-extrabold text-sm text-black">
+                            Recent SaaS Subscription Tax Invoices
+                          </h3>
+                          <p className="text-xs text-neutral-500">
+                            B2B invoices for monthly software and knapsack allocation entitlements
+                          </p>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-neutral-100 text-neutral-400 font-semibold">
+                                <th className="pb-3">Invoice Number</th>
+                                <th className="pb-3">Date</th>
+                                <th className="pb-3">Subtotal</th>
+                                <th className="pb-3">GST Tax (18%)</th>
+                                <th className="pb-3">Total Amount</th>
+                                <th className="pb-3">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100">
+                              {revenueData?.recentSubscriptionInvoices?.length > 0 ? (
+                                revenueData.recentSubscriptionInvoices.map((inv: any) => (
+                                  <tr key={inv._id} className="hover:bg-neutral-50">
+                                    <td className="py-3 font-mono font-bold text-black">{inv.invoiceNumber}</td>
+                                    <td className="py-3 text-neutral-500 font-mono text-[11px]">
+                                      {new Date(inv.issuedAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="py-3 font-semibold text-neutral-800">{formatCurrency(inv.subtotal)}</td>
+                                    <td className="py-3 text-neutral-500">{formatCurrency(inv.tax)}</td>
+                                    <td className="py-3 font-black text-black">{formatCurrency(inv.total)}</td>
+                                    <td className="py-3">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800">
+                                        {inv.status || 'PAID'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td colSpan={6} className="p-6 text-center text-neutral-400">
+                                    Zero subscription invoice records yet.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* MODULE: BUYER SUBSCRIPTIONS MANAGEMENT */}
+              {activeModule === 'subscriptions' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-black">Buyer Procurement Subscriptions Management</h2>
+                      <p className="text-xs text-neutral-500">
+                        Enforce organization entitlement tiers, adjust plans, issue complimentary extensions, and monitor limit consumption
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-3" />
+                        <input
+                          type="text"
+                          value={subscriptionSearch}
+                          onChange={(e) => setSubscriptionSearch(e.target.value)}
+                          placeholder="Search organization..."
+                          className="pl-8 pr-3 py-2 rounded-xl border border-neutral-200 text-xs bg-white focus:outline-none focus:border-black"
+                        />
+                      </div>
+
+                      <select
+                        value={subscriptionPlanFilter}
+                        onChange={(e) => {
+                          setSubscriptionPlanFilter(e.target.value);
+                        }}
+                        className="px-3 py-2 rounded-xl border border-neutral-200 text-xs bg-white font-bold"
+                      >
+                        <option value="ALL">All Plans</option>
+                        <option value="FREE">Free / Trial</option>
+                        <option value="BUSINESS">Business</option>
+                        <option value="ENTERPRISE">Enterprise</option>
+                      </select>
+
+                      <select
+                        value={subscriptionStatusFilter}
+                        onChange={(e) => {
+                          setSubscriptionStatusFilter(e.target.value);
+                        }}
+                        className="px-3 py-2 rounded-xl border border-neutral-200 text-xs bg-white font-bold"
+                      >
+                        <option value="ALL">All Status</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="TRIALING">Trialing</option>
+                        <option value="SUSPENDED">Suspended</option>
+                      </select>
+
+                      <button
+                        onClick={fetchSubscriptions}
+                        className="p-2 border border-neutral-200 rounded-xl hover:bg-neutral-100 text-neutral-700"
+                        title="Refresh"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${loadingSubscriptions ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Counters */}
+                  {subscriptionsSummary && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <div className="p-4 rounded-2xl bg-white border border-neutral-200">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase">Total Subscriptions</span>
+                        <div className="text-xl font-black text-black mt-1">
+                          {subscriptionsSummary.totalSubscriptions}
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white border border-neutral-200">
+                        <span className="text-[10px] font-bold text-green-600 uppercase">Active Accounts</span>
+                        <div className="text-xl font-black text-green-700 mt-1">
+                          {subscriptionsSummary.totalActive}
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white border border-neutral-200">
+                        <span className="text-[10px] font-bold text-agri-orange-600 uppercase">Business Tier</span>
+                        <div className="text-xl font-black text-agri-orange-600 mt-1">
+                          {subscriptionsSummary.totalBusiness}
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white border border-neutral-200">
+                        <span className="text-[10px] font-bold text-purple-600 uppercase">Enterprise Tier</span>
+                        <div className="text-xl font-black text-purple-700 mt-1">
+                          {subscriptionsSummary.totalEnterprise}
+                        </div>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white border border-neutral-200">
+                        <span className="text-[10px] font-bold text-red-500 uppercase">Suspended</span>
+                        <div className="text-xl font-black text-red-600 mt-1">
+                          {subscriptionsSummary.totalSuspended}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subscriptions Table */}
+                  <div className="bg-white rounded-3xl border border-neutral-200 overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-100 text-neutral-400 font-semibold bg-neutral-50/50">
+                            <th className="p-4">Organization / Buyer</th>
+                            <th className="p-4">Plan</th>
+                            <th className="p-4">Status</th>
+                            <th className="p-4">Monthly Reqs</th>
+                            <th className="p-4">Team</th>
+                            <th className="p-4">Period End</th>
+                            <th className="p-4">Payment Method</th>
+                            <th className="p-4 text-right">Admin Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100">
+                          {loadingSubscriptions ? (
+                            <tr>
+                              <td colSpan={8} className="p-8 text-center text-neutral-400">
+                                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading subscriptions...
+                              </td>
+                            </tr>
+                          ) : subscriptionsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="p-8 text-center text-neutral-400">
+                                No organization subscriptions match the specified filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            subscriptionsList.map((sub: any) => (
+                              <tr key={sub._id} className="hover:bg-neutral-50">
+                                <td className="p-4">
+                                  <div className="font-extrabold text-black text-xs">
+                                    {sub.organizationId?.name || 'Commercial Procurement Entity'}
+                                  </div>
+                                  <div className="text-[11px] text-neutral-400">
+                                    {sub.organizationId?.contactPerson || sub.organizationId?.email || 'Registered Buyer'}
+                                  </div>
+                                </td>
+
+                                <td className="p-4">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                    sub.planCode === 'ENTERPRISE'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : sub.planCode === 'BUSINESS'
+                                      ? 'bg-black text-white'
+                                      : 'bg-neutral-100 text-neutral-800'
+                                  }`}>
+                                    {sub.planCode}
+                                  </span>
+                                  {sub.isComplimentary && (
+                                    <span className="block text-[9px] text-agri-orange-600 font-bold mt-0.5">
+                                      Complimentary
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="p-4">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    sub.status === 'ACTIVE'
+                                      ? 'bg-green-100 text-green-800'
+                                      : sub.status === 'SUSPENDED'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {sub.status}
+                                  </span>
+                                </td>
+
+                                <td className="p-4 font-mono text-[11px]">
+                                  <span className="font-bold text-neutral-900">{sub.monthlyRequirementsUsed}</span>
+                                  <span className="text-neutral-400"> / {sub.planId?.features?.maxMonthlyRequirements === -1 ? '∞' : (sub.planId?.features?.maxMonthlyRequirements || 5)}</span>
+                                </td>
+
+                                <td className="p-4 font-mono text-[11px]">
+                                  {sub.memberCount} members
+                                </td>
+
+                                <td className="p-4 font-mono text-[11px] text-neutral-500">
+                                  {new Date(sub.currentPeriodEnd).toLocaleDateString()}
+                                </td>
+
+                                <td className="p-4 font-mono text-[10px] text-neutral-500">
+                                  {sub.paymentProvider || 'INTERNAL_LEDGER'}
+                                </td>
+
+                                <td className="p-4 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedItem(sub);
+                                        setActionStatusInput('CHANGE_PLAN');
+                                        setActionNotesInput(sub.planCode === 'FREE' ? 'BUSINESS' : sub.planCode === 'BUSINESS' ? 'ENTERPRISE' : 'FREE');
+                                        setModalType('SUBSCRIPTION_ACTION');
+                                      }}
+                                      className="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-[11px] font-bold"
+                                    >
+                                      Change Plan
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        setSelectedItem(sub);
+                                        setActionStatusInput('GRANT_COMPLIMENTARY');
+                                        setActionNotesInput('BUSINESS');
+                                        setActionAmountInput(1);
+                                        setModalType('SUBSCRIPTION_ACTION');
+                                      }}
+                                      className="px-2.5 py-1 bg-agri-orange-50 hover:bg-agri-orange-100 text-agri-orange-700 rounded-lg text-[11px] font-bold"
+                                    >
+                                      Complimentary
+                                    </button>
+
+                                    {sub.status === 'ACTIVE' ? (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedItem(sub);
+                                          setActionStatusInput('SUSPEND_SUBSCRIPTION');
+                                          setModalType('SUBSCRIPTION_ACTION');
+                                        }}
+                                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[11px] font-bold"
+                                      >
+                                        Suspend
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedItem(sub);
+                                          setActionStatusInput('ACTIVATE_SUBSCRIPTION');
+                                          setModalType('SUBSCRIPTION_ACTION');
+                                        }}
+                                        className="px-2.5 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-[11px] font-bold"
+                                      >
+                                        Activate
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* MODULE 14: FINANCIAL SETTLEMENT LEDGER */}
               {activeModule === 'ledger' && (
                 <div className="space-y-6">
@@ -2579,6 +3114,53 @@ export default function AdminPortalPage() {
                   placeholder="Enter amount in ₹"
                   className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
                 />
+              </div>
+            )}
+
+            {modalType === 'SUBSCRIPTION_ACTION' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-bold text-neutral-700 text-xs mb-1">Administrative Action</label>
+                  <select
+                    value={actionStatusInput}
+                    onChange={(e) => setActionStatusInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                  >
+                    <option value="CHANGE_PLAN">Change Plan</option>
+                    <option value="GRANT_COMPLIMENTARY">Grant Controlled Complimentary</option>
+                    <option value="SUSPEND_SUBSCRIPTION">Suspend Subscription</option>
+                    <option value="ACTIVATE_SUBSCRIPTION">Re-Activate Subscription</option>
+                  </select>
+                </div>
+
+                {(actionStatusInput === 'CHANGE_PLAN' || actionStatusInput === 'GRANT_COMPLIMENTARY') && (
+                  <div>
+                    <label className="block font-bold text-neutral-700 text-xs mb-1">Target Plan</label>
+                    <select
+                      value={actionNotesInput || 'BUSINESS'}
+                      onChange={(e) => setActionNotesInput(e.target.value)}
+                      className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                    >
+                      <option value="FREE">Free / Trial (₹0/mo)</option>
+                      <option value="BUSINESS">Business Growth (₹4,999/mo)</option>
+                      <option value="ENTERPRISE">Enterprise Procurement (₹19,999/mo)</option>
+                    </select>
+                  </div>
+                )}
+
+                {actionStatusInput === 'GRANT_COMPLIMENTARY' && (
+                  <div>
+                    <label className="block font-bold text-neutral-700 text-xs mb-1">Duration (Months)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={actionAmountInput || 1}
+                      onChange={(e) => setActionAmountInput(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

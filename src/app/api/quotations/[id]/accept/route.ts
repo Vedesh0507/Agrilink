@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { Quotation, Order, FulfillmentEvent, Notification, AuditLog } from '@/models';
+import { Quotation, Order, FulfillmentEvent, Notification, AuditLog, TransactionFee, LedgerEntry, Invoice, PlatformConfig, User, Organization } from '@/models';
 import { authenticateUser } from '@/lib/auth';
+import { getOrCreateOrganizationSubscription } from '@/lib/entitlement';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -73,6 +74,100 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       currentFulfillmentStage: 'ORDER_CONFIRMED',
       notes: `Generated from accepted quotation ${quotation.quotationNumber}`,
     });
+
+    // 1. Determine exact transaction fee percentage for the buyer organization
+    let feePercentage = 2.5; // default fallback
+    let buyerOrgId: any = null;
+
+    try {
+      const buyerUser = await User.findById(quotation.buyerId);
+      if (buyerUser?.organizationId) {
+        buyerOrgId = buyerUser.organizationId;
+        const { plan } = await getOrCreateOrganizationSubscription(buyerOrgId);
+        if (plan?.transactionFeePercentage !== undefined) {
+          feePercentage = plan.transactionFeePercentage;
+        }
+      } else {
+        const config = await PlatformConfig.findOne().lean();
+        if (config?.platformCommissionPercent) {
+          feePercentage = config.platformCommissionPercent;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not resolve custom fee percentage, using platform default:', err);
+    }
+
+    // 2. Calculate immutable financial breakdown
+    const feeAmount = Math.round((totalValue * feePercentage) / 100);
+    const taxAmount = Math.round(feeAmount * 0.18); // 18% GST on platform facilitation service
+    const netPlatformRevenue = feeAmount;
+    const supplierPayableAmount = totalValue - feeAmount;
+
+    // 3. Persist immutable TransactionFee record
+    await TransactionFee.create({
+      orderId: order._id,
+      orderNumber,
+      organizationId: buyerOrgId,
+      buyerId: quotation.buyerId,
+      grossAmount: totalValue,
+      feePercentage,
+      feeAmount,
+      taxAmount,
+      netPlatformRevenue,
+      supplierPayableAmount,
+      status: 'HELD_IN_ESCROW',
+      notes: `Transaction fee of ${feePercentage}% applied on order ${orderNumber}`,
+      finalizedAt: new Date(),
+    });
+
+    // 4. Double-entry bookkeeping in LedgerEntry
+    const ledgerEntryNumber = `LEDGER-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
+    await LedgerEntry.create({
+      entryNumber: ledgerEntryNumber,
+      orderId: order._id.toString(),
+      orderNumber,
+      type: 'PLATFORM_COMMISSION',
+      amount: feeAmount,
+      currency: 'INR',
+      status: 'RECORDED',
+      payerId: quotation.buyerId,
+      payerName: quotation.buyerName,
+      payeeId: 'AGRILINK_PLATFORM',
+      payeeName: 'AgriLink Marketplace Escrow',
+      paymentMethod: 'INTERNAL_LEDGER',
+      notes: `Platform fee (${feePercentage}%) for order ${orderNumber}`,
+    });
+
+    // 5. Generate B2B Order Invoice record
+    const invoiceNumber = `INV-ORD-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+    await Invoice.create({
+      organizationId: buyerOrgId,
+      buyerId: quotation.buyerId,
+      invoiceNumber,
+      type: 'ORDER_SETTLEMENT',
+      orderId: order._id,
+      subtotal: totalValue,
+      platformFee: feeAmount,
+      tax: taxAmount,
+      total: totalValue,
+      currency: 'INR',
+      status: 'ISSUED',
+      lineItems: [
+        {
+          description: `${quotation.product} (${quotation.qualityGrade}) - Agricultural Produce`,
+          quantity: quotation.quantity,
+          unitPrice: quotation.currentAgreedPrice,
+          amount: totalValue,
+          hsnCode: '0709', // Agricultural vegetables HSN
+        },
+      ],
+      billingDetails: {
+        name: quotation.buyerName,
+        address: quotation.deliveryLocation,
+      },
+      issuedAt: new Date(),
+    });
+
 
     // Create 6-stage fulfillment timeline events in MongoDB
     const stageDefinitions = [

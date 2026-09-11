@@ -26,13 +26,18 @@ import {
   Edit3,
   Phone,
   MessageCircle,
+  CreditCard,
+  ShieldCheck,
+  Receipt,
+  Zap,
+  Clock,
 } from 'lucide-react';
 import { formatCurrency, formatQuantity, formatDate } from '@/lib/utils';
 import { IBuyerRequirement, IProduceListing, IMatch, IQuotation, IOrder } from '@/types';
 import UserProfileManager from '@/components/UserProfileManager';
 import { useLanguage } from '@/context/LanguageContext';
 
-type TabType = 'overview' | 'requirements' | 'suppliers' | 'matches' | 'quotations' | 'orders' | 'profile';
+type TabType = 'overview' | 'requirements' | 'suppliers' | 'matches' | 'quotations' | 'orders' | 'profile' | 'billing';
 
 export default function BuyerDashboard() {
   const { user, token, role, demoLogin } = useAuth();
@@ -47,6 +52,15 @@ export default function BuyerDashboard() {
   const [matches, setMatches] = useState<IMatch[]>([]);
   const [quotations, setQuotations] = useState<IQuotation[]>([]);
   const [orders, setOrders] = useState<IOrder[]>([]);
+
+  // Billing & Subscription state
+  const [billingData, setBillingData] = useState<any>(null);
+  const [loadingBilling, setLoadingBilling] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedTargetPlan, setSelectedTargetPlan] = useState<string>('BUSINESS');
+  const [upgradeReason, setUpgradeReason] = useState('');
+  const [upgradingPlan, setUpgradingPlan] = useState(false);
+  const [upgradeFeedback, setUpgradeFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   // Modals & Actions
   const [showAddReqModal, setShowAddReqModal] = useState(false);
@@ -129,21 +143,89 @@ export default function BuyerDashboard() {
     }
   };
 
+  const fetchBillingData = async () => {
+    if (!token) return;
+    setLoadingBilling(true);
+    try {
+      const res = await fetch('/api/billing/subscription', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBillingData(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching billing data:', err);
+    } finally {
+      setLoadingBilling(false);
+    }
+  };
+
+  const handleUpgradePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setUpgradingPlan(true);
+    setUpgradeFeedback(null);
+    try {
+      const idempotencyKey = `SUB-UPG-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const res = await fetch('/api/billing/subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          targetPlanCode: selectedTargetPlan,
+          reason: upgradeReason || `Self-serve plan change to ${selectedTargetPlan}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUpgradeFeedback({ success: true, message: data.message });
+        await fetchBillingData();
+        setTimeout(() => {
+          setShowUpgradeModal(false);
+          setUpgradeFeedback(null);
+        }, 1800);
+      } else {
+        setUpgradeFeedback({ success: false, message: data.error });
+      }
+    } catch (err: any) {
+      setUpgradeFeedback({ success: false, message: err.message });
+    } finally {
+      setUpgradingPlan(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['overview', 'requirements', 'suppliers', 'matches', 'quotations', 'orders', 'profile'].includes(tabParam)) {
+      const planParam = params.get('selectPlan');
+
+      if (tabParam && ['overview', 'requirements', 'suppliers', 'matches', 'quotations', 'orders', 'profile', 'billing'].includes(tabParam)) {
         setActiveTab(tabParam as TabType);
+      }
+      if (planParam && ['FREE', 'BUSINESS', 'ENTERPRISE'].includes(planParam)) {
+        setSelectedTargetPlan(planParam);
+        setShowUpgradeModal(true);
       }
     }
 
     if (user && token && (user.role === 'BUYER' || user.role === 'ADMIN')) {
       fetchData();
+      fetchBillingData();
     } else {
       setLoading(false);
     }
   }, [user, token]);
+
+  useEffect(() => {
+    if (activeTab === 'billing' && token) {
+      fetchBillingData();
+    }
+  }, [activeTab]);
 
   const handleAddRequirement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +245,14 @@ export default function BuyerDashboard() {
         setShowAddReqModal(false);
         setActiveTab('matches');
         fetchData();
+        fetchBillingData();
+      } else if (data.code === 'PLAN_LIMIT_REACHED') {
+        if (confirm(`${data.error}\n\nWould you like to open the Subscription & Billing portal to upgrade your procurement plan?`)) {
+          setShowAddReqModal(false);
+          setActiveTab('billing');
+          setSelectedTargetPlan('BUSINESS');
+          setShowUpgradeModal(true);
+        }
       } else {
         alert('Failed to submit requirement: ' + data.error);
       }
@@ -345,6 +435,7 @@ export default function BuyerDashboard() {
             { id: 'quotations', label: `${t('tab.quotations')} (${quotations.length})`, icon: FileText },
             { id: 'orders', label: `${t('tab.orders')} (${orders.length})`, icon: Truck },
             { id: 'profile', label: t('tab.buyerProfile'), icon: User },
+            { id: 'billing', label: 'Subscription & Billing', icon: CreditCard },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1244,6 +1335,300 @@ export default function BuyerDashboard() {
             <UserProfileManager role="BUYER" />
           </div>
         )}
+
+        {/* TAB 8: SUBSCRIPTION & BILLING */}
+        {activeTab === 'billing' && (
+          <div className="py-6 space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-black">
+                  Organization Subscription & Commercial Billing
+                </h2>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Manage your procurement plan, monthly allocation limits, platform fees, and official tax invoices.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="px-4 py-2.5 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all self-start sm:self-auto"
+              >
+                <Zap className="w-4 h-4" /> Change / Upgrade Plan
+              </button>
+            </div>
+
+            {loadingBilling ? (
+              <div className="p-12 text-center text-neutral-400 font-bold text-xs">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-neutral-500" />
+                Loading organization subscription & billing records...
+              </div>
+            ) : (
+              <>
+                {/* Current Plan Overview Card */}
+                <div className="bg-neutral-900 rounded-3xl p-6 sm:p-8 text-white border border-neutral-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                        Current Plan
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        billingData?.subscription?.status === 'ACTIVE'
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {billingData?.subscription?.status || 'ACTIVE'}
+                      </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-white flex items-baseline gap-2">
+                      <span>{billingData?.plan?.name || 'Free / Trial Plan'}</span>
+                      <span className="text-sm font-normal text-neutral-400">
+                        ({billingData?.plan?.priceMonthly === 0 ? '₹0' : `₹${billingData?.plan?.priceMonthly?.toLocaleString()}`}/month)
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 max-w-xl">
+                      {billingData?.plan?.description || 'Essential procurement tools for small commercial buyers.'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-neutral-800/80 p-4 rounded-2xl border border-neutral-700/60">
+                    <div>
+                      <div className="text-[10px] font-bold text-neutral-400 uppercase">Billing Cycle Ends</div>
+                      <div className="text-xs font-bold text-white mt-0.5">
+                        {billingData?.subscription?.currentPeriodEnd
+                          ? new Date(billingData.subscription.currentPeriodEnd).toLocaleDateString()
+                          : 'Rolling 30 Days'}
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-neutral-700 hidden sm:block" />
+                    <div>
+                      <div className="text-[10px] font-bold text-neutral-400 uppercase">Platform Fee Rate</div>
+                      <div className="text-xs font-black text-agri-orange-400 mt-0.5">
+                        {billingData?.plan?.transactionFeePercentage || 2.5}% on Completed Trades
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Usage & Feature Allocations Grid */}
+                <div>
+                  <h3 className="text-sm font-extrabold text-black mb-3">
+                    Monthly Usage & Feature Entitlements
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Requirement Volume */}
+                    <div className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 font-bold uppercase text-[10px]">
+                        <span>Procurement Requests</span>
+                        <Layers className="w-4 h-4 text-neutral-400" />
+                      </div>
+                      <div className="text-2xl font-black text-neutral-900">
+                        {billingData?.usage?.requirementsUsed || 0}{' '}
+                        <span className="text-xs font-normal text-neutral-400">
+                          / {billingData?.usage?.requirementsMax === -1 ? '∞ Unlimited' : (billingData?.usage?.requirementsMax || 5)}
+                        </span>
+                      </div>
+                      {/* Progress Bar */}
+                      {billingData?.usage?.requirementsMax !== -1 && (
+                        <div className="w-full bg-neutral-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-agri-orange-500 h-2 rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                ((billingData?.usage?.requirementsUsed || 0) / (billingData?.usage?.requirementsMax || 5)) * 100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                      <p className="text-[10px] text-neutral-400">
+                        Period: {billingData?.usage?.usagePeriodMonth || 'Current Month'}
+                      </p>
+                    </div>
+
+                    {/* Organization Users */}
+                    <div className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 font-bold uppercase text-[10px]">
+                        <span>Team Members</span>
+                        <User className="w-4 h-4 text-neutral-400" />
+                      </div>
+                      <div className="text-2xl font-black text-neutral-900">
+                        {billingData?.usage?.organizationUsersCount || 1}{' '}
+                        <span className="text-xs font-normal text-neutral-400">
+                          / {billingData?.usage?.organizationUsersMax === -1 ? '∞ Unlimited' : (billingData?.usage?.organizationUsersMax || 1)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-neutral-500">
+                        Purchasers & warehouse managers under this org
+                      </p>
+                    </div>
+
+                    {/* Advanced Matching */}
+                    <div className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 font-bold uppercase text-[10px]">
+                        <span>Smart Knapsack Matching</span>
+                        <Sparkles className="w-4 h-4 text-agri-orange-500" />
+                      </div>
+                      <div className="text-lg font-black mt-1">
+                        {billingData?.plan?.features?.advancedMatching ? (
+                          <span className="text-green-600 flex items-center gap-1">
+                            <ShieldCheck className="w-4 h-4" /> Enabled
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 flex items-center gap-1 text-xs">
+                            Requires Business Plan
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-neutral-500">
+                        Multi-farmer supply lot aggregation algorithm
+                      </p>
+                    </div>
+
+                    {/* Analytics */}
+                    <div className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between text-xs text-neutral-500 font-bold uppercase text-[10px]">
+                        <span>Advanced Market Analytics</span>
+                        <TrendingUp className="w-4 h-4 text-neutral-400" />
+                      </div>
+                      <div className="text-lg font-black mt-1">
+                        {billingData?.plan?.features?.advancedAnalytics ? (
+                          <span className="text-green-600 flex items-center gap-1">
+                            <ShieldCheck className="w-4 h-4" /> Enabled
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 flex items-center gap-1 text-xs">
+                            Requires Business Plan
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-neutral-500">
+                        Historical mandi price trends & price elasticity
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoices & Billing History */}
+                <div className="bg-white rounded-3xl p-6 border border-neutral-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-extrabold text-sm text-black">
+                        Subscription & Order Tax Invoices
+                      </h3>
+                      <p className="text-xs text-neutral-500">
+                        Compliant B2B tax invoices with HSN codes and GST credit documentation.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-neutral-400">
+                      {billingData?.invoices?.length || 0} Invoices
+                    </span>
+                  </div>
+
+                  {billingData?.invoices?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-100 text-neutral-400 font-semibold">
+                            <th className="pb-3">Invoice Number</th>
+                            <th className="pb-3">Type</th>
+                            <th className="pb-3">Date</th>
+                            <th className="pb-3">Taxable Value</th>
+                            <th className="pb-3">GST (18%)</th>
+                            <th className="pb-3">Total Amount</th>
+                            <th className="pb-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100">
+                          {billingData.invoices.map((inv: any) => (
+                            <tr key={inv._id} className="hover:bg-neutral-50">
+                              <td className="py-3 font-mono font-bold text-black">{inv.invoiceNumber}</td>
+                              <td className="py-3">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-700">
+                                  {inv.type === 'SUBSCRIPTION' ? 'Subscription' : 'Order Trade'}
+                                </span>
+                              </td>
+                              <td className="py-3 text-neutral-500 font-mono text-[11px]">
+                                {new Date(inv.issuedAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 font-medium text-neutral-800">₹{inv.subtotal?.toLocaleString()}</td>
+                              <td className="py-3 font-medium text-neutral-500">₹{inv.tax?.toLocaleString()}</td>
+                              <td className="py-3 font-black text-black">₹{inv.total?.toLocaleString()}</td>
+                              <td className="py-3">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800">
+                                  {inv.status || 'PAID'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-neutral-50 rounded-2xl text-xs text-neutral-400">
+                      No invoices generated yet for this organization.
+                    </div>
+                  )}
+                </div>
+
+                {/* Executed Order Transaction Fees */}
+                <div className="bg-white rounded-3xl p-6 border border-neutral-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-extrabold text-sm text-black">
+                        Executed Trade Transaction Fees
+                      </h3>
+                      <p className="text-xs text-neutral-500">
+                        Immutable fee records finalized on successfully completed B2B consignments.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-neutral-400">
+                      {billingData?.transactionFees?.length || 0} Records
+                    </span>
+                  </div>
+
+                  {billingData?.transactionFees?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-100 text-neutral-400 font-semibold">
+                            <th className="pb-3">Order Number</th>
+                            <th className="pb-3">Gross Value</th>
+                            <th className="pb-3">Fee Rate</th>
+                            <th className="pb-3">Platform Fee</th>
+                            <th className="pb-3">GST Tax</th>
+                            <th className="pb-3">Supplier Net Payable</th>
+                            <th className="pb-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100">
+                          {billingData.transactionFees.map((fee: any) => (
+                            <tr key={fee._id} className="hover:bg-neutral-50">
+                              <td className="py-3 font-mono font-bold text-black">{fee.orderNumber}</td>
+                              <td className="py-3 font-bold text-neutral-900">₹{fee.grossAmount?.toLocaleString()}</td>
+                              <td className="py-3 font-bold text-agri-orange-600">{fee.feePercentage}%</td>
+                              <td className="py-3 font-semibold text-neutral-800">₹{fee.feeAmount?.toLocaleString()}</td>
+                              <td className="py-3 text-neutral-500">₹{fee.taxAmount?.toLocaleString()}</td>
+                              <td className="py-3 font-black text-black">₹{fee.supplierPayableAmount?.toLocaleString()}</td>
+                              <td className="py-3">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                  {fee.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-neutral-50 rounded-2xl text-xs text-neutral-400">
+                      No order transaction fees recorded yet.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     )}
 
@@ -1431,6 +1816,140 @@ export default function BuyerDashboard() {
                   className="px-5 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 text-white rounded-xl font-bold shadow-sm"
                 >
                   Transmit Counter-Offer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PLAN UPGRADE / CHANGE MODAL */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-neutral-200 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div>
+                <h3 className="font-extrabold text-lg text-black">
+                  Select Procurement Plan
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  Choose a subscription plan to increase your monthly volume and unlock specialized features.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="text-neutral-400 hover:text-black text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {upgradeFeedback && (
+              <div
+                className={`p-3 rounded-xl text-xs font-bold ${
+                  upgradeFeedback.success
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {upgradeFeedback.message}
+              </div>
+            )}
+
+            <form onSubmit={handleUpgradePlan} className="space-y-4">
+              {/* Plan Choices */}
+              <div className="space-y-3">
+                {[
+                  {
+                    code: 'FREE',
+                    name: 'Free / Trial',
+                    price: '₹0 / mo',
+                    desc: '5 requests/mo • 1 user • Standard matching • 2.5% fee',
+                  },
+                  {
+                    code: 'BUSINESS',
+                    name: 'Business Growth',
+                    price: '₹4,999 / mo',
+                    desc: '30 requests/mo • 5 users • Smart Knapsack • Analytics • 1.5% fee',
+                  },
+                  {
+                    code: 'ENTERPRISE',
+                    name: 'Enterprise Procurement',
+                    price: '₹19,999 / mo',
+                    desc: 'Unlimited requests • 25 users • API & ERP Access • Dedicated manager • 1.0% fee',
+                  },
+                ].map((p) => {
+                  const isSelected = selectedTargetPlan === p.code;
+                  return (
+                    <label
+                      key={p.code}
+                      onClick={() => setSelectedTargetPlan(p.code)}
+                      className={`block p-4 rounded-2xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-agri-orange-500 bg-agri-orange-50/40 ring-2 ring-agri-orange-500/20'
+                          : 'border-neutral-200 hover:border-neutral-300 bg-neutral-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="targetPlan"
+                            value={p.code}
+                            checked={isSelected}
+                            onChange={() => setSelectedTargetPlan(p.code)}
+                            className="text-agri-orange-500 focus:ring-agri-orange-500"
+                          />
+                          <span className="font-black text-sm text-neutral-900">{p.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-agri-orange-600">{p.price}</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-1 pl-5.5">{p.desc}</p>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 text-xs mb-1">
+                  Reason / Operational Justification
+                </label>
+                <input
+                  type="text"
+                  value={upgradeReason}
+                  onChange={(e) => setUpgradeReason(e.target.value)}
+                  placeholder="e.g. Scaling tomato procurement for supermarket chain"
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-xs focus:outline-none focus:border-agri-orange-500"
+                />
+              </div>
+
+              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-[11px] text-neutral-500 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                <span>
+                  All changes are cryptographically logged in the security audit trail. In test sandbox mode, plans activate immediately with an automated B2B invoice.
+                </span>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="px-4 py-2 border border-neutral-200 text-neutral-700 rounded-xl font-bold hover:bg-neutral-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={upgradingPlan}
+                  className="px-6 py-2 bg-agri-orange-500 hover:bg-agri-orange-600 disabled:opacity-50 text-white rounded-xl font-bold shadow-sm flex items-center gap-1.5"
+                >
+                  {upgradingPlan ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>Confirm Plan Change</>
+                  )}
                 </button>
               </div>
             </form>

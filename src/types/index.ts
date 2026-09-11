@@ -384,3 +384,119 @@ export interface IMarketplaceAnnouncement {
   sentAt: string | Date;
 }
 
+export type PlanCode = 'FREE' | 'BUSINESS' | 'ENTERPRISE';
+
+export interface ISubscriptionPlan {
+  _id?: string;
+  name: string;
+  code: PlanCode;
+  description: string;
+  priceMonthly: number;
+  currency: string;
+  billingInterval: 'MONTHLY' | 'ANNUAL';
+  features: {
+    maxMonthlyRequirements: number;
+    maxOrganizationUsers: number;
+    advancedMatching: boolean;
+    advancedAnalytics: boolean;
+    negotiationWorkspace: boolean;
+    prioritySupport: boolean;
+    apiAccess: boolean;
+    erpIntegration: boolean;
+    dedicatedManager: boolean;
+  };
+  transactionFeePercentage: number;
+  enabled: boolean;
+  isPopular?: boolean;
+}
+
+export interface IBuyerSubscription {
+  _id?: string;
+  organizationId: string;
+  planId: string | ISubscriptionPlan;
+  planCode: PlanCode;
+  status: 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELLED' | 'SUSPENDED';
+  currentPeriodStart: string | Date;
+  currentPeriodEnd: string | Date;
+  trialStartDate?: string | Date;
+  trialEndDate?: string | Date;
+  autoRenew: boolean;
+  monthlyRequirementsUsed: number;
+  usagePeriodMonth: string;
+  paymentProvider: 'NONE' | 'RAZORPAY' | 'CASHFREE' | 'MANUAL_COMPLIMENTARY' | 'INTERNAL_LEDGER';
+  externalSubscriptionId?: string;
+  isComplimentary?: boolean;
+  complimentaryReason?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface ITransactionFee {
+  _id?: string;
+  orderId: string;
+  orderNumber: string;
+  organizationId?: string;
+  buyerId: string;
+  grossAmount: number;
+  feePercentage: number;
+  feeAmount: number;
+  taxAmount: number;
+  netPlatformRevenue: number;
+  supplierPayableAmount: number;
+  status: 'CALCULATED' | 'HELD_IN_ESCROW' | 'COLLECTED' | 'REFUNDED' | 'WAIVED';
+  notes?: string;
+  finalizedAt: string | Date;
+  createdAt: string | Date;
+}
+
+export interface IPayment {
+  _id?: string;
+  organizationId?: string;
+  orderId?: string;
+  subscriptionId?: string;
+  purpose: 'ORDER_ESCROW' | 'SUBSCRIPTION_FEE' | 'TRANSACTION_FEE' | 'DISPUTE_SETTLEMENT';
+  amount: number;
+  currency: string;
+  provider: 'RAZORPAY' | 'CASHFREE' | 'INTERNAL_LEDGER' | 'OFFLINE_NEFT';
+  providerPaymentId?: string;
+  providerOrderId?: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+  paymentMethod?: string;
+  paidAt?: string | Date;
+  failureReason?: string;
+  createdAt: string | Date;
+}
+
+export interface IInvoice {
+  _id?: string;
+  organizationId?: string;
+  buyerId?: string;
+  invoiceNumber: string;
+  type: 'SUBSCRIPTION' | 'ORDER_PLATFORM_FEE' | 'ORDER_SETTLEMENT';
+  orderId?: string;
+  subscriptionId?: string;
+  subtotal: number;
+  platformFee: number;
+  tax: number;
+  total: number;
+  currency: string;
+  status: 'ISSUED' | 'PAID' | 'VOID' | 'REFUNDED';
+  lineItems: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    hsnCode?: string;
+  }>;
+  billingDetails?: {
+    name: string;
+    gstin?: string;
+    pan?: string;
+    address?: string;
+  };
+  issuedAt: string | Date;
+  paidAt?: string | Date;
+  dueDate?: string | Date;
+}
+
+
