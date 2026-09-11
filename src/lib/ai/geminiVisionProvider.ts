@@ -44,11 +44,21 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
   private fallbackModel = 'gemini-3.5-flash';
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.GEMINI_API_KEY || '';
+    this.apiKey = apiKey || '';
+  }
+
+  private getEffectiveApiKey(): string {
+    return (
+      this.apiKey ||
+      process.env.GEMINI_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+      ''
+    );
   }
 
   async analyzeProduceLot(request: AnalyzeProduceRequest): Promise<AnalyzeProduceResult> {
-    if (!this.apiKey) {
+    const activeKey = this.getEffectiveApiKey();
+    if (!activeKey) {
       return {
         success: false,
         error: 'Gemini API key is not configured on the server.',
@@ -64,23 +74,30 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
       };
     }
 
-    // Try primary model first, fallback to secondary model if error occurs
-    try {
-      return await this.callGemini(this.primaryModel, request);
-    } catch (primaryErr: any) {
-      console.warn(`Primary Gemini model (${this.primaryModel}) failed:`, primaryErr?.message || primaryErr);
+    // Resilient multi-attempt strategy with backoff across active vision models
+    const modelsToTry = [this.primaryModel, this.fallbackModel, 'gemini-3.7-flash'];
+    let lastError = '';
+
+    for (let attempt = 0; attempt < modelsToTry.length; attempt++) {
+      const model = modelsToTry[attempt];
       try {
-        console.log(`Falling back to secondary model (${this.fallbackModel})...`);
-        return await this.callGemini(this.fallbackModel, request);
-      } catch (fallbackErr: any) {
-        console.error('All Gemini vision models failed:', fallbackErr?.message || fallbackErr);
-        return {
-          success: false,
-          error: `AI analysis service currently unavailable: ${fallbackErr?.message || 'Vision assessment failed'}`,
-          disclaimer: MANDATORY_DISCLAIMER,
-        };
+        if (attempt > 0) {
+          // Short delay before retry to absorb brief network/rate demand spikes
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
+        }
+        return await this.callGemini(model, request);
+      } catch (err: any) {
+        lastError = err?.message || String(err);
+        console.warn(`Gemini model ${model} attempt ${attempt + 1} failed:`, lastError);
       }
     }
+
+    console.error('All Gemini vision attempts exhausted:', lastError);
+    return {
+      success: false,
+      error: `AI analysis service temporarily busy: ${lastError}`,
+      disclaimer: MANDATORY_DISCLAIMER,
+    };
   }
 
   private async callGemini(model: string, request: AnalyzeProduceRequest): Promise<AnalyzeProduceResult> {
@@ -134,7 +151,7 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
     };
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-      this.apiKey
+      this.getEffectiveApiKey()
     )}`;
 
     const controller = new AbortController();
