@@ -4,6 +4,8 @@ import { MarketplaceAnnouncement, User, Notification } from '@/models';
 import { authenticateUser, verifyAdminPermission } from '@/lib/auth';
 import { createAuditEntry } from '@/lib/audit';
 
+export const dynamic = 'force-dynamic';
+
 // GET list past announcements
 export async function GET(req: NextRequest) {
   try {
