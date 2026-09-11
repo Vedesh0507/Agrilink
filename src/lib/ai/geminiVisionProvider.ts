@@ -23,9 +23,9 @@ You MUST output valid JSON matching this schema:
 
 STRICT ASSESSMENT RULES:
 1. recommendedQuality MUST be exactly one of: 'Grade A', 'Grade B', or 'Grade C'.
-   - 'Grade A': High visual uniformity, excellent vibrant coloration, minimal surface blemish (<5%), optimal commercial market standard.
-   - 'Grade B': Moderate uniformity, acceptable commercial coloration, slight visible surface marks/scratches (<15%), suitable for wholesale trade.
-   - 'Grade C': Significant visible cosmetic defects, uneven sizing, mechanical bruises, or non-uniform coloration; suitable for industrial food processing or discount distribution.
+   - 'Grade A': Strictly for clean, undamaged, healthy, fresh produce with high visual uniformity, vibrant coloration, minimal surface blemishes (<5%), zero visible rot, zero mold.
+   - 'Grade B': Moderate visual uniformity, acceptable commercial coloration, slight superficial marks/scratches (<15%), but completely sound, edible, and FREE OF ACTIVE ROT OR MOLD.
+   - 'Grade C': Significant visible defects (>15%), severe cosmetic blemishes, mechanical bruises, necrotic lesions, fungal spots, decay, active mold, or decomposing/spoiled fruits. If the produce exhibits ANY rot, decomposition, mold, or active disease, it MUST be graded as 'Grade C' with needsHumanReview: true!
 2. If the farmer provided a crop name, use it as context to confirm or refine identification.
 3. NEVER claim to evaluate internal rot, pesticide residue, chemical composition, sugar/brix content, taste, or moisture. Visual inspection evaluates only exterior characteristics.
 4. If images are blurry, too dark, distant, or unclear, assign imageQuality accordingly ('BLURRY', 'DARK', 'POOR', or 'INSUFFICIENT'), set confidence < 0.70, confidenceLevel to 'LOW', and flag needsHumanReview: true.
@@ -187,14 +187,96 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
     }
 
     // Normalise Quality Grade to strict enum: 'Grade A' | 'Grade B' | 'Grade C'
+    // Normalise arrays first so they can be inspected by safety guardrails
+    const visibleIndicators = Array.isArray(parsedJson.visibleIndicators)
+      ? parsedJson.visibleIndicators.map((s: any) => String(s).trim()).filter(Boolean)
+      : ['Visual inspection completed'];
+
+    const warnings = Array.isArray(parsedJson.warnings)
+      ? parsedJson.warnings.map((s: any) => String(s).trim()).filter(Boolean)
+      : [];
+
+    // Normalise Quality Grade strictly (avoiding substring bugs where 'GRADE C' contains 'A' from 'GRADE')
     let recommendedQuality: 'Grade A' | 'Grade B' | 'Grade C' = 'Grade B';
-    const rawGrade = String(parsedJson.recommendedQuality || '').toUpperCase();
-    if (rawGrade.includes('A') || rawGrade === 'GRADE A') {
-      recommendedQuality = 'Grade A';
-    } else if (rawGrade.includes('C') || rawGrade === 'GRADE C') {
+    const rawGrade = String(parsedJson.recommendedQuality || '').trim().toUpperCase();
+
+    // Check for Grade C / Reject / Spoilage first
+    if (
+      rawGrade === 'GRADE C' ||
+      rawGrade === 'C' ||
+      rawGrade.endsWith(' C') ||
+      rawGrade.startsWith('C') ||
+      rawGrade.includes('GRADE_C') ||
+      rawGrade.includes('REJECT') ||
+      rawGrade.includes('SPOILED') ||
+      rawGrade.includes('ROTTEN') ||
+      rawGrade.includes('DISCARD') ||
+      rawGrade.includes('POOR')
+    ) {
       recommendedQuality = 'Grade C';
+    } else if (
+      rawGrade === 'GRADE B' ||
+      rawGrade === 'B' ||
+      rawGrade.endsWith(' B') ||
+      rawGrade.startsWith('B') ||
+      rawGrade.includes('GRADE_B') ||
+      rawGrade.includes('STANDARD') ||
+      rawGrade.includes('MEDIUM')
+    ) {
+      recommendedQuality = 'Grade B';
+    } else if (
+      rawGrade === 'GRADE A' ||
+      rawGrade === 'A' ||
+      rawGrade.endsWith(' A') ||
+      rawGrade.startsWith('A') ||
+      rawGrade.includes('GRADE_A') ||
+      rawGrade.includes('PREMIUM')
+    ) {
+      recommendedQuality = 'Grade A';
     } else {
       recommendedQuality = 'Grade B';
+    }
+
+    // Safety Guardrail: If visual indicators or warnings detect active rot, mold, decomposition, or necrosis, force Grade C
+    const allObservationsText = [
+      ...visibleIndicators,
+      ...warnings,
+      parsedJson.detectedProduce || '',
+      rawGrade,
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    const severeDefectKeywords = [
+      'rot',
+      'mold',
+      'mould',
+      'fungal',
+      'decay',
+      'necrotic',
+      'decompos',
+      'spoil',
+      'lesion',
+      'ruptur',
+      'wrinkling, collapse',
+      'black lesions',
+      'pest damage',
+      'contamination',
+      'spoilage',
+    ];
+
+    const hasSevereDefects = severeDefectKeywords.some((kw) =>
+      allObservationsText.includes(kw)
+    );
+
+    let needsHumanReview = Boolean(parsedJson.needsHumanReview);
+
+    if (hasSevereDefects) {
+      recommendedQuality = 'Grade C';
+      needsHumanReview = true;
+      if (!warnings.some((w: string) => w.toLowerCase().includes('contamination') || w.toLowerCase().includes('rot'))) {
+        warnings.unshift('Severe visual defects, rot, or mold detected on produce. Lot is classified as Grade C / Processing.');
+      }
     }
 
     // Normalise confidence
@@ -217,15 +299,6 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
       ? parsedJson.imageQuality
       : 'ACCEPTABLE';
 
-    // Normalise arrays
-    const visibleIndicators = Array.isArray(parsedJson.visibleIndicators)
-      ? parsedJson.visibleIndicators.map((s: any) => String(s).trim()).filter(Boolean)
-      : ['Visual inspection completed'];
-
-    const warnings = Array.isArray(parsedJson.warnings)
-      ? parsedJson.warnings.map((s: any) => String(s).trim()).filter(Boolean)
-      : [];
-
     // Add mandatory safety advisory to warnings if not present
     if (!warnings.some((w: string) => w.toLowerCase().includes('internal') || w.toLowerCase().includes('lab'))) {
       warnings.push('Internal quality, taste, and chemical composition cannot be determined by visual images.');
@@ -240,7 +313,7 @@ export class GeminiProduceVisionProvider implements IProduceVisionProvider {
       imageQuality: imageQuality as any,
       visibleIndicators,
       warnings,
-      needsHumanReview: Boolean(parsedJson.needsHumanReview || confidenceLevel === 'LOW'),
+      needsHumanReview: Boolean(needsHumanReview || parsedJson.needsHumanReview || confidenceLevel === 'LOW'),
       analyzedAt: new Date(),
       modelVersion: model,
       provider: 'Google Gemini',
